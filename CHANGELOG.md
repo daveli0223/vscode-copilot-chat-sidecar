@@ -6,6 +6,22 @@ For more frequent updates, check the [Commit log](https://github.com/Microsoft/v
 
 ---
 
+## [Unreleased] — Sidecar fork
+
+### Fixed
+- **PWA toolbar buttons** — `attachFile`, `attachSelection`, and `openModelPicker` now focus
+  the VS Code chat panel before executing; previously they silently did nothing because the
+  commands require the chat widget to be active
+- **Sessions not syncing on connect** — bridge re-broadcasts the conversation list 2 seconds
+  after a new phone client connects, catching sessions that cloud providers hadn't returned
+  in time for the initial on-connect snapshot
+
+### Changed
+- Added sidecar fork context and session-wrap workflow to `.github/copilot-instructions.md`
+  so Copilot agents automatically commit and changelog after non-trivial sessions
+
+---
+
 # Past updates
 
 ## 0.41 (2026-03-25)
