@@ -2907,6 +2907,11 @@
 						"default": "ngrok",
 						"description": "Tunnel provider used by Sidecar to make the local bridge server reachable from your phone. ngrok is the default."
 					},
+					"github.copilot.sidecar.ngrokDomain": {
+						"type": "string",
+						"default": "",
+						"description": "Optional static ngrok domain (e.g. your-word.ngrok-free.app) to use instead of a random ephemeral URL. Get one free from https://dashboard.ngrok.com/domains — requires ngrok as the tunnel provider."
+					},
 					"github.copilot.chat.backgroundAgent.enabled": {
 						"type": "boolean",
 						"default": true,

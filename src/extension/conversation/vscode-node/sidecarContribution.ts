@@ -42,6 +42,7 @@ const devTunnelUrlPattern = /https?:\/\/[^\s"'<>`]+/g;
 /** Allowed values for the `github.copilot.sidecar.tunnelProvider` setting. */
 type TunnelProvider = 'auto' | 'ngrok' | 'devtunnel' | 'cloudflare';
 const tunnelProviderSettingKey = 'github.copilot.sidecar.tunnelProvider';
+const ngrokDomainSettingKey = 'github.copilot.sidecar.ngrokDomain';
 const defaultTunnelProvider: TunnelProvider = 'ngrok';
 
 type TunnelHostAttemptResult = {
@@ -95,8 +96,9 @@ function isNgrokHost(host: string | undefined): boolean {
 	}
 
 	const normalizedHost = host.trim().toLowerCase();
-	// ngrok v3 free: *.ngrok-free.app; ngrok v2 / custom domains: *.ngrok.io / *.ngrok.app
+	// ngrok v3 free: *.ngrok-free.app / *.ngrok-free.dev; ngrok v2 / custom domains: *.ngrok.io / *.ngrok.app
 	return normalizedHost.endsWith('.ngrok-free.app')
+		|| normalizedHost.endsWith('.ngrok-free.dev')
 		|| normalizedHost.endsWith('.ngrok.io')
 		|| normalizedHost.endsWith('.ngrok.app');
 }
@@ -675,7 +677,13 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 		let ngrokProcess: ChildProcessWithoutNullStreams;
 		try {
 			// `--log=stdout` ensures structured log lines come through stdout so we can parse them.
-			ngrokProcess = spawn(ngrokExecutableName, ['http', `${port}`, '--log=stdout', '--log-format=json']);
+			const ngrokArgs = ['http', `${port}`, '--log=stdout', '--log-format=json'];
+			const ngrokDomain = vscode.workspace.getConfiguration().get<string>(ngrokDomainSettingKey, '').trim();
+			if (ngrokDomain) {
+				ngrokArgs.push(`--domain=${ngrokDomain}`);
+				this.logService.info(`[Sidecar] ngrok using static domain: ${ngrokDomain}`);
+			}
+			ngrokProcess = spawn(ngrokExecutableName, ngrokArgs);
 		} catch (error) {
 			const reason = error instanceof Error ? error.message : String(error);
 			this.logService.warn(`[Sidecar] Failed to launch ngrok process: ${reason}`);

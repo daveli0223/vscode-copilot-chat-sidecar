@@ -129,6 +129,10 @@
 				if (this.token) {
 					url.searchParams.set('token', this.token);
 				}
+				// Bypass ngrok free-tier browser interstitial warning page,
+				// which would otherwise cause the WebSocket handshake to fail
+				// (the browser WebSocket API cannot set custom request headers).
+				url.searchParams.set('ngrok-skip-browser-warning', '1');
 				return url.toString();
 			} catch {
 				return undefined;
