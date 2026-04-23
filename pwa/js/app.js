@@ -841,6 +841,9 @@
 		state.client.addEventListener('open', () => {
 			requestConversationList();
 			if (state.currentConversationId) {
+				// Always re-select on (re)connect so history is refreshed with any messages
+				// that arrived while the phone was offline. renderHistory() uses a
+				// DocumentFragment swap so there is no visible blank flash.
 				state.client.send({ type: 'conversation:select', conversationId: state.currentConversationId });
 			}
 		});

@@ -50,7 +50,7 @@
 			if (window.marked) {
 				window.marked.setOptions({
 					gfm: true,
-					breaks: false,
+					breaks: true,
 					headerIds: false,
 					mangle: false,
 					highlight(code, lang) {
@@ -80,11 +80,21 @@
 		}
 
 		renderHistory(turns) {
-			this.clear();
+			this.streamingTurns.clear();
+			this.historyCounter = 0;
+
 			if (!Array.isArray(turns) || turns.length === 0) {
+				this.container.innerHTML = '';
 				this.showEmptyState('No messages yet.');
 				return;
 			}
+
+			// Render all turns into a detached DocumentFragment first, then atomically swap
+			// into the DOM. This prevents a visible blank flash when refreshing history
+			// after a reconnect (the old content stays visible until the new content is ready).
+			const fragment = document.createDocumentFragment();
+			const savedContainer = this.container;
+			this.container = fragment;
 
 			for (const turn of turns) {
 				if (turn.role === 'user') {
@@ -93,6 +103,10 @@
 					this.appendAssistantMessage(turn.content, turn.artifacts, turn.toolLines);
 				}
 			}
+
+			this.container = savedContainer;
+			this.container.replaceChildren(fragment);
+			this.scrollToBottom();
 		}
 
 		appendUserTurn(content) {
