@@ -369,6 +369,53 @@ You can test without deploying GitHub Pages.
    - Regenerate token from the Sidecar panel and rescan.
    - Reopen the Sidecar panel to refresh the pairing URL.
 
+## Keeping Up to Date
+
+This fork tracks [microsoft/vscode-copilot-chat](https://github.com/microsoft/vscode-copilot-chat), which moves fast (~500 commits/month). The branch layout is:
+
+```
+upstream/main  ──── (latest microsoft commits)
+                        │
+sidecar        ──────── (sidecar-specific commits on top of upstream)
+                            │
+feat/proxy     ────────────── (tunnel/proxy commits on top of sidecar)
+```
+
+### Automated sync (GitHub Actions)
+
+A scheduled workflow ([`.github/workflows/sync-upstream.yml`](.github/workflows/sync-upstream.yml)) runs **every Monday at 08:00 UTC** and automatically rebases `sidecar` onto `upstream/main`, then rebases `feat/proxy` on top of the updated `sidecar`. It skips if the branch is already current.
+
+You can also trigger it manually from the **Actions** tab → **Sync with upstream** → **Run workflow**.
+
+### Manual sync
+
+If you need to sync outside the schedule:
+
+```bash
+# 1. Make sure the upstream remote exists (one-time setup)
+git remote add upstream https://github.com/microsoft/vscode-copilot-chat.git
+
+# 2. Fetch the latest upstream commits
+git fetch upstream
+
+# 3. Check how far behind sidecar is
+git rev-list sidecar..upstream/main --count
+# If output is 0, you're up to date — nothing to do.
+
+# 4. Rebase sidecar onto upstream/main
+git checkout sidecar
+git rebase upstream/main
+
+# 5. Rebase feat/proxy on top of the updated sidecar
+git checkout feat/proxy
+git rebase sidecar
+
+# 6. Force-push both branches (history was rewritten)
+git push --force-with-lease origin sidecar feat/proxy
+```
+
+> **Conflict resolution:** If `git rebase` stops with a conflict, fix the conflicting files, then run `git add <file>` and `git rebase --continue`. If things go wrong, `git rebase --abort` returns you to the pre-rebase state.
+
 ## Original Repo
 
 This is just a fork. The original repo can be found [here](https://github.com/microsoft/vscode-copilot-chat/).

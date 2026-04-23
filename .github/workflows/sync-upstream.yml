@@ -1,0 +1,88 @@
+name: Sync with upstream
+
+on:
+  schedule:
+    # Every Monday at 08:00 UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (fetch + check only, no push)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Rebase sidecar + feat/proxy onto upstream/main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feat/proxy (full history)
+        uses: actions/checkout@v4
+        with:
+          ref: feat/proxy
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/microsoft/vscode-copilot-chat.git
+
+      - name: Fetch upstream main + origin branches
+        run: |
+          git fetch upstream main
+          git fetch origin sidecar feat/proxy
+
+      - name: Check if sidecar is behind upstream/main
+        id: check
+        run: |
+          BEHIND=$(git rev-list origin/sidecar..upstream/main --count)
+          echo "sidecar_behind=$BEHIND" >> "$GITHUB_OUTPUT"
+          echo "sidecar is $BEHIND commit(s) behind upstream/main"
+
+      - name: Rebase sidecar onto upstream/main
+        if: steps.check.outputs.sidecar_behind != '0'
+        run: |
+          git checkout -b sidecar origin/sidecar
+          git rebase upstream/main
+          echo "sidecar rebased successfully"
+
+      - name: Rebase feat/proxy onto (updated) sidecar
+        if: steps.check.outputs.sidecar_behind != '0'
+        run: |
+          git checkout -b feat/proxy-rebased origin/feat/proxy
+          git rebase sidecar
+          echo "feat/proxy rebased successfully"
+
+      - name: Show what will be pushed
+        if: steps.check.outputs.sidecar_behind != '0'
+        run: |
+          echo "=== sidecar: new tip ==="
+          git log --oneline -5 sidecar
+          echo ""
+          echo "=== feat/proxy: new tip ==="
+          git log --oneline -5 feat/proxy-rebased
+
+      - name: Push rebased branches
+        if: steps.check.outputs.sidecar_behind != '0' && inputs.dry_run != true
+        run: |
+          git push --force-with-lease origin sidecar:sidecar
+          git push --force-with-lease origin feat/proxy-rebased:feat/proxy
+          echo "Both branches pushed successfully"
+
+      - name: Nothing to do
+        if: steps.check.outputs.sidecar_behind == '0'
+        run: |
+          echo "sidecar is already up to date with upstream/main. Nothing to push."
+
+      - name: Dry run summary
+        if: inputs.dry_run == true
+        run: |
+          echo "DRY RUN — no changes were pushed"
