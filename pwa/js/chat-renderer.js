@@ -165,6 +165,13 @@
 			const row = this.createMessageRow('assistant');
 			row.element.classList.add('streaming');
 
+			// Show a "thinking" dots animation immediately so the user sees
+			// feedback before the first chunk arrives.
+			const thinkingEl = document.createElement('div');
+			thinkingEl.className = 'assistant-thinking';
+			thinkingEl.innerHTML = '<span></span><span></span><span></span>';
+			row.contentHost.appendChild(thinkingEl);
+
 			const historyToolLinesHost = document.createElement('div');
 			historyToolLinesHost.className = 'assistant-history-tool-lines';
 			row.contentHost.appendChild(historyToolLinesHost);
@@ -212,6 +219,7 @@
 			this.container.appendChild(row.element);
 
 			entry = {
+				thinkingEl,
 				element: row.element,
 				contentHost: row.contentHost,
 				historyToolLinesHost,
@@ -264,6 +272,11 @@
 			}
 
 			const entry = this.startAssistantTurn(turnId);
+			// Hide the thinking indicator as soon as real content arrives.
+			if (entry.thinkingEl && entry.thinkingEl.parentNode) {
+				entry.thinkingEl.remove();
+				entry.thinkingEl = null;
+			}
 			entry.markdown += chunk;
 			entry.markdownHost.innerHTML = this.renderMarkdown(entry.markdown);
 			this.decorateCodeBlocks(entry.markdownHost);

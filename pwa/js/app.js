@@ -272,8 +272,10 @@
 		}
 
 		for (const conversation of state.conversations) {
+			const isActive = conversation.id === state.currentConversationId;
+			const isStreaming = isActive && state.isStreaming;
 			const item = document.createElement('li');
-			item.className = `conversation-item${conversation.id === state.currentConversationId ? ' active' : ''}`;
+			item.className = `conversation-item${isActive ? ' active' : ''}${isStreaming ? ' streaming' : ''}`;
 			item.tabIndex = 0;
 			item.setAttribute('role', 'button');
 			item.dataset.conversationId = conversation.id;
@@ -471,13 +473,13 @@
 			state.currentConversationId = message.conversationId;
 			window.localStorage.setItem('sidecar.currentConversationId', message.conversationId);
 			state.isComposingNewConversation = false;
-			renderConversationList();
 		}
 		updateConversation(message.conversationId, { lastUpdated: Date.now() });
 		if (message.conversationId === state.currentConversationId) {
 			renderer.startAssistantTurn(message.turnId);
 			state.isStreaming = true;
 			updateComposerStopState();
+			renderConversationList();
 		}
 	}
 
@@ -568,6 +570,7 @@
 			renderer.completeAssistantTurn(message.turnId);
 			state.isStreaming = false;
 			updateComposerStopState();
+			renderConversationList();
 		}
 	}
 
