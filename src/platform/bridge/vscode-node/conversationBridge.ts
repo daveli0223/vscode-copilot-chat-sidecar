@@ -2247,12 +2247,12 @@ export class ConversationBridge extends Disposable {
 	private async executeUiCommand(commandId: BridgeUiCommandId, args?: readonly unknown[]): Promise<void> {
 		try {
 			// Some commands require the chat panel to be active/focused before they work.
-			// Focus it first so pickers and context-sensitive actions open correctly.
+			// Focus it first and wait 350 ms for the widget to settle before running the command.
 			const needsFocus = commandId === 'workbench.action.chat.attachFile'
-				|| commandId === 'workbench.action.chat.attachSelection'
-				|| commandId === 'github.copilot.chat.openModelPicker';
+				|| commandId === 'workbench.action.chat.attachSelection';
 			if (needsFocus) {
 				await vscode.commands.executeCommand('workbench.action.chat.open');
+				await new Promise<void>(resolve => setTimeout(resolve, 350));
 			}
 			if (args && args.length > 0) {
 				await vscode.commands.executeCommand(commandId, ...args);

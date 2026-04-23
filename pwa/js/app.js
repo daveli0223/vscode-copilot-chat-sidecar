@@ -710,19 +710,20 @@
 
 		if (attachFileEl) {
 			attachFileEl.addEventListener('click', () => {
-				state.client?.send({ type: 'ui:command', commandId: 'workbench.action.chat.attachFile' });
+				state.client?.send({ type: 'ui:command', commandId: 'github.copilot.chat.attachFile' });
 			});
 		}
 
 		if (attachSelectionEl) {
 			attachSelectionEl.addEventListener('click', () => {
-				state.client?.send({ type: 'ui:command', commandId: 'workbench.action.chat.attachSelection' });
+				state.client?.send({ type: 'ui:command', commandId: 'github.copilot.chat.attachSelection' });
 			});
 		}
 
 		if (openModelPickerEl) {
 			openModelPickerEl.addEventListener('click', () => {
-				state.client?.send({ type: 'ui:command', commandId: 'github.copilot.chat.openModelPicker' });
+				// Open VS Code's chat panel and bring model picker into view.
+				state.client?.send({ type: 'ui:command', commandId: 'workbench.action.chat.open' });
 			});
 		}
 	}
