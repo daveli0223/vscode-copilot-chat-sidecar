@@ -1,0 +1,25 @@
+---
+description: Session wrap and changelog workflow — run after any meaningful agent session
+alwaysApply: false
+---
+
+# Session Wrap — Changelog Workflow
+
+After any non-trivial session (debug, fix, feature, refactor, research):
+
+1. Evaluate what changed or was discovered
+2. Commit all modified source files with a conventional commit message
+3. Append an entry to `CHANGELOG.md` (create if absent) in Keep a Changelog format
+
+**Trigger phrases (run without asking):** "wrap up", "commit findings",
+"save and commit", "update changelog", "log our changes", "commit the fix".
+
+## Project Notes
+
+- Build & reinstall: `./script/reinstall-sidecar.sh`
+- Push: `git push --no-verify origin feat/proxy`
+- Active branch: `feat/proxy`
+
+## Commit Convention
+
+Use Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`.
