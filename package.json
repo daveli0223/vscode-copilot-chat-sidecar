@@ -2890,6 +2890,11 @@
 				"title": "GitHub Copilot Chat",
 				"id": "stable",
 				"properties": {
+					"github.copilot.sidecar.enabled": {
+						"type": "boolean",
+						"default": true,
+						"description": "Enable the Sidecar mobile bridge in this workspace. Set to false to hide the status bar item and prevent tunnel creation."
+					},
 					"github.copilot.sidecar.tunnelProvider": {
 						"type": "string",
 						"enum": [

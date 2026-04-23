@@ -41,6 +41,7 @@ const devTunnelUrlPattern = /https?:\/\/[^\s"'<>`]+/g;
 
 /** Allowed values for the `github.copilot.sidecar.tunnelProvider` setting. */
 type TunnelProvider = 'auto' | 'ngrok' | 'devtunnel' | 'cloudflare';
+const sidecarEnabledSettingKey = 'github.copilot.sidecar.enabled';
 const tunnelProviderSettingKey = 'github.copilot.sidecar.tunnelProvider';
 const ngrokDomainSettingKey = 'github.copilot.sidecar.ngrokDomain';
 const defaultTunnelProvider: TunnelProvider = 'cloudflare';
@@ -428,7 +429,10 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 			() => this.sessionSourceRegistry.listSummaries(),
 			(fn) => this.sessionSourceRegistry.setOnTitleChange(fn),
 		));
-		this.registerUi();
+		const enabled = vscode.workspace.getConfiguration().get<boolean>(sidecarEnabledSettingKey, true);
+		if (enabled) {
+			this.registerUi();
+		}
 		this.activationBlocker = Promise.resolve();
 	}
 
