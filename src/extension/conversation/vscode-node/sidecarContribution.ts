@@ -43,7 +43,7 @@ const devTunnelUrlPattern = /https?:\/\/[^\s"'<>`]+/g;
 type TunnelProvider = 'auto' | 'ngrok' | 'devtunnel' | 'cloudflare';
 const tunnelProviderSettingKey = 'github.copilot.sidecar.tunnelProvider';
 const ngrokDomainSettingKey = 'github.copilot.sidecar.ngrokDomain';
-const defaultTunnelProvider: TunnelProvider = 'ngrok';
+const defaultTunnelProvider: TunnelProvider = 'cloudflare';
 
 type TunnelHostAttemptResult = {
 	readonly uri: vscode.Uri | undefined;
@@ -498,7 +498,7 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 		const preferred = this.getConfiguredTunnelProvider();
 
 		// 'auto' tries all three in a sensible order (no-auth providers first).
-		const autoOrder: ReadonlyArray<TunnelProvider> = ['ngrok', 'cloudflare', 'devtunnel'];
+		const autoOrder: ReadonlyArray<TunnelProvider> = ['cloudflare', 'ngrok', 'devtunnel'];
 		const ordered: ReadonlyArray<TunnelProvider> = preferred === 'auto'
 			? autoOrder
 			: [preferred, ...autoOrder.filter(p => p !== preferred)];
