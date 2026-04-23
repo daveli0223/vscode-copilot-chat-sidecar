@@ -1370,8 +1370,18 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 		}
 
 		try {
+			// Embed ngrok-skip-browser-warning in the ws= URL so that tunnel proxies
+			// (ngrok free tier) bypass their browser interstitial page. Browsers cannot
+			// set custom request headers on WebSocket connections, so the query param
+			// is the only way. The hosted PWA preserves existing query params when it
+			// builds the final WebSocket URL, so this works regardless of which PWA is used.
+			const wsUrl = new URL(bridgeWsUri.toString(true));
+			if (isNgrokHost(wsUrl.hostname)) {
+				wsUrl.searchParams.set('ngrok-skip-browser-warning', '1');
+			}
+
 			const url = new URL(pwaBaseUrl);
-			url.searchParams.set('ws', bridgeWsUri.toString(true));
+			url.searchParams.set('ws', wsUrl.toString());
 			url.searchParams.set('token', this.bridgeServer.sessionToken);
 			return url.toString();
 		} catch {

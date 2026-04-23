@@ -493,6 +493,15 @@ export class BridgeServer extends Disposable {
 			this.clients.add(websocket);
 			this._onDidClientCountChange.fire(this.clients.size);
 
+			// Send WebSocket-protocol pings every 30 s to keep the connection alive
+			// through ngrok and other tunnel proxies that drop idle connections.
+			// Browsers automatically reply with a pong frame at the protocol level.
+			const pingInterval = setInterval(() => {
+				if (websocket.readyState === WebSocket.OPEN) {
+					websocket.ping();
+				}
+			}, 30_000);
+
 			const respond = (message: BridgeMessage) => {
 				this.sendToClient(websocket, message);
 			};
@@ -544,11 +553,13 @@ export class BridgeServer extends Disposable {
 			});
 
 			websocket.on('close', () => {
+				clearInterval(pingInterval);
 				this.clients.delete(websocket);
 				this._onDidClientCountChange.fire(this.clients.size);
 			});
 
 			websocket.on('error', () => {
+				clearInterval(pingInterval);
 				this.clients.delete(websocket);
 				this._onDidClientCountChange.fire(this.clients.size);
 			});
