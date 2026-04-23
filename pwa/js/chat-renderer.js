@@ -17,11 +17,16 @@
 			this.streamingTurns = new Map();
 			this.historyCounter = 0;
 			this.commandRunner = undefined;
+			this.confirmationRunner = undefined;
 			this.configureMarkdown();
 		}
 
 		setCommandRunner(commandRunner) {
 			this.commandRunner = commandRunner;
+		}
+
+		setConfirmationRunner(confirmationRunner) {
+			this.confirmationRunner = confirmationRunner;
 		}
 
 		configureMarkdown() {
@@ -498,9 +503,19 @@
 				const buttonRow = document.createElement('div');
 				buttonRow.className = 'assistant-confirmation-buttons';
 				for (const buttonText of buttons) {
-					const buttonEl = document.createElement('span');
+					const buttonEl = document.createElement('button');
+					buttonEl.type = 'button';
 					buttonEl.className = 'assistant-confirmation-button';
 					buttonEl.textContent = buttonText;
+					buttonEl.addEventListener('click', () => {
+						if (typeof this.confirmationRunner === 'function') {
+							this.confirmationRunner(buttonText);
+						}
+						// Disable all buttons in this confirmation after one is clicked.
+						for (const sibling of buttonRow.querySelectorAll('button')) {
+							sibling.disabled = true;
+						}
+					});
 					buttonRow.appendChild(buttonEl);
 				}
 				item.appendChild(buttonRow);

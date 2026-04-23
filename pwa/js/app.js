@@ -63,6 +63,18 @@
 		});
 	});
 
+	renderer.setConfirmationRunner(buttonText => {
+		if (!state.client || !buttonText) {
+			return;
+		}
+
+		state.client.send({
+			type: 'prompt:submit',
+			content: buttonText,
+			conversationId: state.currentConversationId,
+		});
+	});
+
 	function normalizeEndpoint(rawWsUrl, rawToken) {
 		const wsUrl = typeof rawWsUrl === 'string' ? rawWsUrl.trim() : '';
 		const token = typeof rawToken === 'string' ? rawToken.trim() : '';

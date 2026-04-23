@@ -8,6 +8,8 @@ vite.config.ts
 .esbuild/extension.esbuild.ts
 test/simulation/fixtures/**
 test/scenarios/**
+# PWA static web assets — not part of the compiled extension codebase
+pwa/**
 .simulation/**
 .eslintplugin/**
 chat-lib/**
