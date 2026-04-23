@@ -9,16 +9,19 @@ For more frequent updates, check the [Commit log](https://github.com/Microsoft/v
 ## [Unreleased] — Sidecar fork
 
 ### Fixed
-- **PWA toolbar buttons** — `attachFile`, `attachSelection`, and `openModelPicker` now focus
-  the VS Code chat panel before executing; previously they silently did nothing because the
-  commands require the chat widget to be active
-- **Sessions not syncing on connect** — bridge re-broadcasts the conversation list 2 seconds
-  after a new phone client connects, catching sessions that cloud providers hadn't returned
-  in time for the initial on-connect snapshot
-
-### Changed
-- Added sidecar fork context and session-wrap workflow to `.github/copilot-instructions.md`
-  so Copilot agents automatically commit and changelog after non-trivial sessions
+- **PWA toolbar buttons** — attach buttons now use the correct extension-registered command IDs
+  (`github.copilot.chat.attachFile/Selection`); bridge waits 350ms after focusing chat panel
+  so the widget is interactive before the command fires
+- **Model picker button** — now focuses VS Code chat panel instead of the unrelated
+  inline-completions model picker
+- **Scroll lock on mobile** — threshold raised from 80px to 200px so momentum scrolling
+  doesn't accidentally re-enable auto-scroll
+- **Auto-attached reference clutter** — `.env*`, `AGENTS.md`, `CLAUDE.md`, `node_modules`,
+  `.next`, `.git` references now hidden from PWA alongside instruction files
+- **Sessions not syncing on connect** — bridge re-broadcasts conversation list 2s after
+  a new phone client connects
+- **ngrok conflict** — removed hardcoded `tunnelProvider: ngrok` from user settings;
+  both VS Code windows now use cloudflare with separate independent tunnel URLs
 
 ---
 
