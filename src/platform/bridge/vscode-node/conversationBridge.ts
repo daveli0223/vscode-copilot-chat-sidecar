@@ -92,6 +92,15 @@ type JsonConversationScanOptions = {
 	readonly fallbackLastUpdated: number;
 };
 
+/** Returns true for instruction/rules files that should be hidden from the phone display. */
+function isInstructionFileUri(uri: string): boolean {
+	const lower = uri.toLowerCase();
+	return lower.endsWith('.instructions.md')
+		|| lower.endsWith('copilot-instructions.md')
+		|| lower.includes('.github/instructions/')
+		|| lower.includes('.claude/rules/');
+}
+
 export class ConversationBridge extends Disposable {
 	private isActive = false;
 	private readonly transcriptsDirUri: URI | undefined;
@@ -206,8 +215,8 @@ export class ConversationBridge extends Disposable {
 			});
 		}));
 		this._register(this.conversationStore.onDidAssistantTurnReference(event => {
-			// Skip auto-attached instruction files — they clutter the phone display
-			if (event.uri && (event.uri.endsWith('.instructions.md') || event.uri.includes('.github/instructions/'))) {
+			// Skip auto-attached instruction/rules files — they clutter the phone display
+			if (event.uri && isInstructionFileUri(event.uri)) {
 				return;
 			}
 			this.bridgeServer.broadcast({
@@ -1159,7 +1168,7 @@ export class ConversationBridge extends Disposable {
 		}
 
 		const filteredReferences = artifacts.references.filter(
-			r => !(r.uri && (r.uri.endsWith('.instructions.md') || r.uri.includes('.github/instructions/')))
+			r => !(r.uri && isInstructionFileUri(r.uri))
 		);
 		const bridgeArtifacts: BridgeAssistantTurnArtifacts = {
 			statuses: artifacts.statuses.length > 0 ? [...artifacts.statuses] : undefined,

@@ -36,8 +36,8 @@
 		conversations: [],
 		optimisticByConversation: new Map(),
 		pendingOptimisticContent: undefined,
-		// Start in "new conversation" mode so a page refresh doesn't auto-resume the previous chat.
-		isComposingNewConversation: true,
+		// Only block auto-select when the user explicitly chose to start a fresh conversation.
+		isComposingNewConversation: false,
 		isStreaming: false,
 		conversationFilter: {
 			search: '',
