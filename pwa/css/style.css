@@ -937,6 +937,77 @@ details[open] > .assistant-thinking-summary::before {
 	background: var(--vscode-button-hoverBackground);
 }
 
+.send-button .stop-icon { display: none; }
+
+.send-button.stop-mode .send-icon { display: none; }
+.send-button.stop-mode .stop-icon { display: block; }
+.send-button.stop-mode {
+	background: var(--vscode-statusBarItem-errorBackground, #c72e0f);
+}
+.send-button.stop-mode:hover {
+	background: var(--vscode-statusBarItem-errorBackground, #a02508);
+	opacity: 0.85;
+}
+
+/* ---- Todo widget ---- */
+.assistant-todo-widget {
+	margin: 4px 0;
+	border: 1px solid var(--vscode-editorWidget-border, rgba(255,255,255,0.12));
+	border-radius: 6px;
+	overflow: hidden;
+	font-size: 12px;
+}
+
+.todo-header {
+	padding: 5px 10px;
+	background: var(--vscode-editorWidget-background, rgba(255,255,255,0.06));
+	font-weight: 600;
+	color: var(--vscode-descriptionForeground);
+	border-bottom: 1px solid var(--vscode-editorWidget-border, rgba(255,255,255,0.08));
+}
+
+.todo-list {
+	list-style: none;
+	margin: 0;
+	padding: 4px 0;
+}
+
+.todo-item {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	padding: 3px 10px;
+	color: var(--vscode-foreground);
+}
+
+.todo-icon {
+	font-size: 11px;
+	flex-shrink: 0;
+	width: 12px;
+	text-align: center;
+}
+
+.todo-label {
+	flex: 1;
+}
+
+.todo-item.todo-completed .todo-label {
+	text-decoration: line-through;
+	opacity: 0.55;
+}
+
+.todo-item.todo-completed .todo-icon {
+	color: var(--vscode-testing-iconPassed, #4caf50);
+}
+
+.todo-item.todo-in-progress .todo-icon {
+	color: var(--vscode-progressBar-background, #0e70c0);
+}
+
+.todo-item.todo-not-started .todo-icon {
+	opacity: 0.45;
+}
+
 /* ---- Empty state ---- */
 .empty-state {
 	color: var(--vscode-descriptionForeground);

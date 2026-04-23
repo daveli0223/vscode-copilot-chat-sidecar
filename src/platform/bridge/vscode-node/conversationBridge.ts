@@ -233,6 +233,7 @@ export class ConversationBridge extends Disposable {
 				message: event.message,
 				isError: event.isError,
 				isComplete: event.isComplete,
+				todoList: event.todoList,
 			});
 		}));
 		this._register(this.conversationStore.onDidAssistantTurnConfirmation(event => {

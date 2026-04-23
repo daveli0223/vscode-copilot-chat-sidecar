@@ -36,7 +36,9 @@
 		conversations: [],
 		optimisticByConversation: new Map(),
 		pendingOptimisticContent: undefined,
-		isComposingNewConversation: false,
+		// Start in "new conversation" mode so a page refresh doesn't auto-resume the previous chat.
+		isComposingNewConversation: true,
+		isStreaming: false,
 		conversationFilter: {
 			search: '',
 			provider: '',
@@ -99,23 +101,6 @@
 		);
 		if (storedEndpoint) {
 			return storedEndpoint;
-		}
-
-		const pairingInput = window.prompt('Paste the Sidecar pairing URL from VS Code');
-		if (!pairingInput) {
-			return undefined;
-		}
-
-		try {
-			const pairingUrl = new URL(pairingInput);
-			const parsedEndpoint = normalizeEndpoint(pairingUrl.searchParams.get('ws'), pairingUrl.searchParams.get('token'));
-			if (parsedEndpoint) {
-				window.localStorage.setItem('sidecar.wsUrl', parsedEndpoint.wsUrl);
-				window.localStorage.setItem('sidecar.token', parsedEndpoint.token);
-				return parsedEndpoint;
-			}
-		} catch {
-			// No-op: invalid URL entered.
 		}
 
 		return undefined;
@@ -390,9 +375,27 @@
 		return false;
 	}
 
+	function updateComposerStopState() {
+		const sendButton = document.getElementById('send-button');
+		if (!sendButton) {
+			return;
+		}
+		if (state.isStreaming) {
+			sendButton.classList.add('stop-mode');
+			sendButton.title = 'Stop';
+			sendButton.setAttribute('aria-label', 'Stop');
+		} else {
+			sendButton.classList.remove('stop-mode');
+			sendButton.title = 'Send';
+			sendButton.setAttribute('aria-label', 'Send');
+		}
+	}
+
 	function selectConversation(conversationId) {
 		state.currentConversationId = conversationId;
 		state.isComposingNewConversation = false;
+		state.isStreaming = false;
+		updateComposerStopState();
 		renderConversationList();
 		renderer.showEmptyState('Loading conversation...');
 		if (state.client) {
@@ -468,6 +471,8 @@
 		updateConversation(message.conversationId, { lastUpdated: Date.now() });
 		if (message.conversationId === state.currentConversationId) {
 			renderer.startAssistantTurn(message.turnId);
+			state.isStreaming = true;
+			updateComposerStopState();
 		}
 	}
 
@@ -556,6 +561,8 @@
 		updateConversation(message.conversationId, { lastUpdated: Date.now() });
 		if (message.conversationId === state.currentConversationId) {
 			renderer.completeAssistantTurn(message.turnId);
+			state.isStreaming = false;
+			updateComposerStopState();
 		}
 	}
 
@@ -671,7 +678,11 @@
 
 		composerEl.addEventListener('submit', event => {
 			event.preventDefault();
-			submitPrompt();
+			if (state.isStreaming) {
+				state.client?.send({ type: 'ui:command', commandId: 'workbench.action.chat.stop' });
+			} else {
+				submitPrompt();
+			}
 		});
 
 		if (modeSelectorEl) {
@@ -740,6 +751,8 @@
 				state.currentConversationId = undefined;
 				state.pendingOptimisticContent = undefined;
 				state.isComposingNewConversation = true;
+				state.isStreaming = false;
+				updateComposerStopState();
 				renderConversationList();
 				renderer.showEmptyState('Start a new conversation by typing a message.');
 				promptInputEl.focus();
@@ -855,7 +868,7 @@
 		}
 
 		initializeConnection(endpoint);
-		renderer.showEmptyState('Waiting for conversations...');
+		renderer.showEmptyState('Start a new conversation below, or tap ☰ to browse history.');
 	}
 
 	bootstrap();

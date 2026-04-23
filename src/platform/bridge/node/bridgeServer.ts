@@ -35,12 +35,19 @@ export interface BridgeAssistantStatusItem {
 	readonly content: string;
 }
 
+export interface BridgeTodoListItem {
+	readonly id: number;
+	readonly title: string;
+	readonly status: 'not-started' | 'in-progress' | 'completed';
+}
+
 export interface BridgeAssistantToolInvocationItem {
 	readonly toolName: string;
 	readonly toolCallId: string;
 	readonly message: string | undefined;
 	readonly isError: boolean;
 	readonly isComplete: boolean;
+	readonly todoList?: readonly BridgeTodoListItem[];
 }
 
 export interface BridgeAssistantReferenceItem {
@@ -274,6 +281,7 @@ export type BridgeMessage =
 		message?: string;
 		isError: boolean;
 		isComplete: boolean;
+		todoList?: readonly BridgeTodoListItem[];
 	}
 	| {
 		type: 'turn:confirmation';

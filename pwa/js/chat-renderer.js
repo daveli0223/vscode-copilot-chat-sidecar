@@ -460,6 +460,13 @@
 				return;
 			}
 
+			// If the tool has a todo list, render it as a dedicated todo widget (replaces plain text).
+			if (Array.isArray(tool.todoList) && tool.todoList.length > 0) {
+				this._renderTodoList(entry, toolCallId, tool.todoList);
+				this.scrollToBottom();
+				return;
+			}
+
 			let item = entry.toolItems.get(toolCallId);
 			if (!item) {
 				item = document.createElement('div');
@@ -478,6 +485,53 @@
 
 			item.textContent = `${toolName}: ${summary}`;
 			this.scrollToBottom();
+		}
+
+		_renderTodoList(entry, toolCallId, todoList) {
+			let widget = entry.toolItems.get(toolCallId);
+			if (!widget) {
+				widget = document.createElement('div');
+				widget.className = 'assistant-todo-widget';
+				entry.toolItems.set(toolCallId, widget);
+				entry.toolHost.appendChild(widget);
+			}
+
+			const done = todoList.filter(t => t.status === 'completed').length;
+			const total = todoList.length;
+
+			widget.innerHTML = '';
+
+			const header = document.createElement('div');
+			header.className = 'todo-header';
+			header.textContent = `Todos (${done}/${total})`;
+			widget.appendChild(header);
+
+			const list = document.createElement('ul');
+			list.className = 'todo-list';
+			for (const item of todoList) {
+				const li = document.createElement('li');
+				li.className = `todo-item todo-${item.status}`;
+
+				const icon = document.createElement('span');
+				icon.className = 'todo-icon';
+				icon.setAttribute('aria-hidden', 'true');
+				if (item.status === 'completed') {
+					icon.textContent = '✓';
+				} else if (item.status === 'in-progress') {
+					icon.textContent = '●';
+				} else {
+					icon.textContent = '○';
+				}
+
+				const label = document.createElement('span');
+				label.className = 'todo-label';
+				label.textContent = item.title;
+
+				li.appendChild(icon);
+				li.appendChild(label);
+				list.appendChild(li);
+			}
+			widget.appendChild(list);
 		}
 
 		appendAssistantConfirmation(turnId, confirmation) {

@@ -65,6 +65,12 @@ export interface IConversationTurnStatusEvent {
 	readonly content: string;
 }
 
+export interface ITodoListItem {
+	readonly id: number;
+	readonly title: string;
+	readonly status: 'not-started' | 'in-progress' | 'completed';
+}
+
 export interface IConversationTurnToolInvocationEvent {
 	readonly conversationId: string;
 	readonly turnId: string;
@@ -73,6 +79,7 @@ export interface IConversationTurnToolInvocationEvent {
 	readonly message: string | undefined;
 	readonly isError: boolean;
 	readonly isComplete: boolean;
+	readonly todoList?: readonly ITodoListItem[];
 }
 
 export interface IConversationTurnConfirmationEvent {
@@ -224,6 +231,7 @@ export interface IConversationAssistantToolInvocationItem {
 	readonly message: string | undefined;
 	readonly isError: boolean;
 	readonly isComplete: boolean;
+	readonly todoList?: readonly ITodoListItem[];
 }
 
 export interface IConversationAssistantReferenceItem {
@@ -611,6 +619,7 @@ export class ConversationStore extends Disposable implements IConversationStore 
 			message: event.message,
 			isError: event.isError,
 			isComplete: event.isComplete,
+			todoList: event.todoList,
 		};
 
 		if (existingIndex === -1) {
@@ -625,6 +634,7 @@ export class ConversationStore extends Disposable implements IConversationStore 
 			message: updatedItem.message ?? previous.message,
 			isError: updatedItem.isError,
 			isComplete: updatedItem.isComplete,
+			todoList: updatedItem.todoList ?? previous.todoList,
 		};
 	}
 

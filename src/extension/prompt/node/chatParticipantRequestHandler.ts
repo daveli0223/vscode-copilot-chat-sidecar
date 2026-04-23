@@ -310,6 +310,19 @@ export class ChatParticipantRequestHandler {
 			?? this.extractTextValue(part.pastTenseMessage)
 			?? this.extractTextValue(part.originMessage);
 
+		// Extract todo list from ChatTodoToolInvocationData (proposed API) via duck-typing.
+		// ChatTodoStatus enum: NotStarted=1, InProgress=2, Completed=3
+		const toolSpecificData = (part as { toolSpecificData?: unknown }).toolSpecificData;
+		let todoList: IConversationTurnToolInvocationEvent['todoList'];
+		if (toolSpecificData && typeof toolSpecificData === 'object' && Array.isArray((toolSpecificData as { todoList?: unknown }).todoList)) {
+			const rawTodos = (toolSpecificData as { todoList: Array<{ id: number; title: string; status: number }> }).todoList;
+			todoList = rawTodos.map(t => ({
+				id: t.id,
+				title: t.title,
+				status: t.status === 2 ? 'in-progress' : t.status === 3 ? 'completed' : 'not-started',
+			}));
+		}
+
 		return {
 			conversationId: this.conversation.sessionId,
 			turnId: this.turn.id,
@@ -318,6 +331,7 @@ export class ChatParticipantRequestHandler {
 			message,
 			isError: Boolean(part.isError),
 			isComplete: Boolean(part.isComplete),
+			todoList,
 		};
 	}
 
