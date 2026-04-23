@@ -43,6 +43,33 @@ const UI_MODES: readonly BridgeModeOption[] = [
 ];
 const FILE_TYPE_FILE = 1;
 const FILE_TYPE_DIRECTORY = 2;
+
+/**
+ * Returns true for file references that Copilot auto-attaches as implicit context
+ * (instruction files, agent config files, .env files, build artifacts, etc.).
+ * These clutter the phone display and should be hidden from the PWA.
+ */
+function isAutoAttachedReference(uri: string | undefined): boolean {
+	if (!uri) {
+		return false;
+	}
+	const lower = uri.toLowerCase();
+	const filename = lower.split('/').pop() ?? lower;
+	// Instruction / agent config files
+	if (lower.endsWith('.instructions.md')) { return true; }
+	if (lower.endsWith('copilot-instructions.md')) { return true; }
+	if (lower.includes('.github/instructions/')) { return true; }
+	if (lower.includes('.claude/rules/')) { return true; }
+	if (filename === 'claude.md' || filename === 'agents.md') { return true; }
+	// Environment / secret files
+	if (filename.startsWith('.env')) { return true; }
+	// Common build / system directories and marker files
+	if (lower.includes('/node_modules/') || lower.endsWith('/node_modules')) { return true; }
+	if (lower.includes('/.next/') || lower.endsWith('/.next')) { return true; }
+	if (lower.includes('/.git/') || lower.endsWith('/.git')) { return true; }
+	return false;
+}
+
 const ENABLE_LEGACY_GLOBAL_JSON_FALLBACK = false;
 const ENABLE_LEGACY_CLI_METADATA_FALLBACK = false;
 const GLOBAL_STORAGE_SCAN_MAX_DEPTH = 6;
@@ -207,8 +234,8 @@ export class ConversationBridge extends Disposable {
 			});
 		}));
 		this._register(this.conversationStore.onDidAssistantTurnReference(event => {
-			// Skip auto-attached instruction files — they clutter the phone display
-			if (event.uri && (event.uri.endsWith('.instructions.md') || event.uri.includes('.github/instructions/'))) {
+			// Skip auto-attached context files — they clutter the phone display
+			if (isAutoAttachedReference(event.uri)) {
 				return;
 			}
 			this.bridgeServer.broadcast({
@@ -1200,7 +1227,7 @@ export class ConversationBridge extends Disposable {
 		}
 
 		const filteredReferences = artifacts.references.filter(
-			r => !(r.uri && (r.uri.endsWith('.instructions.md') || r.uri.includes('.github/instructions/')))
+			r => !isAutoAttachedReference(r.uri)
 		);
 		const bridgeArtifacts: BridgeAssistantTurnArtifacts = {
 			statuses: artifacts.statuses.length > 0 ? [...artifacts.statuses] : undefined,
