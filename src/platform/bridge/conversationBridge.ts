@@ -292,35 +292,32 @@ export class ConversationBridge extends Disposable {
 
 		if (providerSummaries.length > 0) {
 			const canonical = new Map<string, BridgeConversationSummary>();
+			const upsertCanonical = (summary: BridgeConversationSummary, enrichOnly = false): void => {
+				const existing = canonical.get(summary.id);
+				if (existing) {
+					canonical.set(summary.id, this.enrichCanonicalSummary(existing, summary));
+				} else if (!enrichOnly) {
+					canonical.set(summary.id, summary);
+				}
+			};
+
 			for (const summary of providerSummaries) {
 				canonical.set(summary.id, summary);
 			}
 
+			// Include workspace sessions regardless of whether they match a provider session.
+			// Sessions with matching IDs are enriched in place; unmatched sessions are added so
+			// that their file-based history remains accessible.
 			for (const summary of workspaceSummaries) {
-				const existing = canonical.get(summary.id);
-				if (!existing) {
-					continue;
-				}
-
-				canonical.set(summary.id, this.enrichCanonicalSummary(existing, summary));
+				upsertCanonical(summary, false);
 			}
 
 			for (const summary of await this.readGlobalStorageJsonSummaries()) {
-				const existing = canonical.get(summary.id);
-				if (!existing) {
-					continue;
-				}
-
-				canonical.set(summary.id, this.enrichCanonicalSummary(existing, summary));
+				upsertCanonical(summary, true);
 			}
 
 			for (const summary of await this.readCopilotCliSessionSummaries()) {
-				const existing = canonical.get(summary.id);
-				if (!existing) {
-					continue;
-				}
-
-				canonical.set(summary.id, this.enrichCanonicalSummary(existing, summary));
+				upsertCanonical(summary, false);
 			}
 
 			const summaries = Array.from(canonical.values()).sort((a, b) => b.lastUpdated - a.lastUpdated);

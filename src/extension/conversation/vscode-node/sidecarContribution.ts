@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) David Khachaturov. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
@@ -25,17 +25,28 @@ const pwaDevUrlEnvVar = 'COPILOT_PWA_DEV_URL';
 const devTunnelDomainSuffix = '.devtunnels.ms';
 const devTunnelInstallUrl = 'https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/get-started';
 const devTunnelExecutableName = 'devtunnel';
+const ngrokExecutableName = 'ngrok';
+const ngrokInstallUrl = 'https://ngrok.com/download';
 const devTunnelStartupTimeoutMs = 15000;
+const ngrokStartupTimeoutMs = 15000;
 const devTunnelOutputBufferLimit = 16000;
 const bridgeEndpointProbeTimeoutMs = 4000;
 const bridgeEndpointProbeMaxBodyBytes = 12000;
 const bridgeEndpointProbeSignature = 'Copilot Sidecar Bridge';
 const devTunnelUrlPattern = /https?:\/\/[^\s"'<>`]+/g;
 
-type DevTunnelHostAttemptResult = {
+/** Allowed values for the `github.copilot.sidecar.tunnelProvider` setting. */
+type TunnelProvider = 'auto' | 'ngrok' | 'devtunnel';
+const tunnelProviderSettingKey = 'github.copilot.sidecar.tunnelProvider';
+const defaultTunnelProvider: TunnelProvider = 'ngrok';
+
+type TunnelHostAttemptResult = {
 	readonly uri: vscode.Uri | undefined;
 	readonly failureReason: string | undefined;
 };
+
+/** @deprecated Rename kept for backwards compat within the file. */
+type DevTunnelHostAttemptResult = TunnelHostAttemptResult;
 
 type SidecarState = 'disconnected' | 'starting' | 'ready';
 
@@ -72,6 +83,18 @@ function isDevTunnelsHost(host: string | undefined): boolean {
 
 	const normalizedHost = host.trim().toLowerCase();
 	return normalizedHost === 'devtunnels.ms' || normalizedHost.endsWith(devTunnelDomainSuffix);
+}
+
+function isNgrokHost(host: string | undefined): boolean {
+	if (!host) {
+		return false;
+	}
+
+	const normalizedHost = host.trim().toLowerCase();
+	// ngrok v3 free: *.ngrok-free.app; ngrok v2 / custom domains: *.ngrok.io / *.ngrok.app
+	return normalizedHost.endsWith('.ngrok-free.app')
+		|| normalizedHost.endsWith('.ngrok.io')
+		|| normalizedHost.endsWith('.ngrok.app');
 }
 
 function isPublicTunnelUri(uri: vscode.Uri): boolean {
@@ -334,6 +357,8 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 	private startPromise: Promise<void> | undefined;
 	private hasRegisteredBridgeListeners = false;
 	private devTunnelHostProcess: ChildProcessWithoutNullStreams | undefined;
+	/** Active provider that owns the current tunnel process. */
+	private activeTunnelProvider: TunnelProvider | undefined;
 
 	constructor(
 		@IConversationStore conversationStore: IConversationStore,
@@ -382,7 +407,7 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 			this.stopDevTunnelHost();
 			const port = await this.bridgeServer.start();
 			const localBridgeUri = vscode.Uri.parse(`http://localhost:${port}`);
-			this.tunnelUri = await this.resolveDevTunnelUri(localBridgeUri);
+			this.tunnelUri = await this.resolveTunnelUri(localBridgeUri);
 			this.conversationBridge.activate();
 			if (!this.hasRegisteredBridgeListeners) {
 				this._register(this.bridgeServer.onDidClientCountChange(() => {
@@ -394,7 +419,7 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 
 			this.sidecarState = 'ready';
 			this.updateStatusBar();
-			this.logService.info(`[Sidecar] bridge ready at ${this.tunnelUri.toString(true)}`);
+			this.logService.info(`[Sidecar] bridge ready at ${this.tunnelUri.toString(true)} (provider: ${this.activeTunnelProvider ?? 'unknown'})`);
 		} catch (error) {
 			this.stopDevTunnelHost();
 			this.sidecarState = 'disconnected';
@@ -404,18 +429,47 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 		}
 	}
 
-	private async resolveDevTunnelUri(localBridgeUri: vscode.Uri): Promise<vscode.Uri> {
+	/** Read the configured tunnel provider, defaulting to ngrok. */
+	private getConfiguredTunnelProvider(): TunnelProvider {
+		const value = vscode.workspace.getConfiguration().get<string>(tunnelProviderSettingKey, defaultTunnelProvider);
+		if (value === 'devtunnel' || value === 'ngrok' || value === 'auto') {
+			return value;
+		}
+		return defaultTunnelProvider;
+	}
+
+	private async resolveTunnelUri(localBridgeUri: vscode.Uri): Promise<vscode.Uri> {
+		// 1. Let VS Code resolve externally (works in Remote / Codespaces).
 		const initialResolution = await vscode.env.asExternalUri(localBridgeUri);
 		if (await this.isBridgeEndpointUsable(initialResolution, 'vscode.env.asExternalUri')) {
 			return initialResolution;
 		}
 
-		const autoResolved = await this.tryBootstrapDevTunnel(localBridgeUri);
-		if (autoResolved) {
-			return autoResolved;
+		// 2. Try configured / default provider then fall back to the other.
+		const preferred = this.getConfiguredTunnelProvider();
+		const ordered: ReadonlyArray<TunnelProvider> = preferred === 'devtunnel'
+			? ['devtunnel', 'ngrok']
+			: ['ngrok', 'devtunnel'];
+
+		for (const provider of (preferred === 'auto' ? ['ngrok', 'devtunnel'] as const : ordered)) {
+			const uri = await this.tryBootstrapTunnel(localBridgeUri, provider);
+			if (uri) {
+				this.activeTunnelProvider = provider;
+				return uri;
+			}
 		}
 
-		throw new Error(`Sidecar requires a Dev Tunnel endpoint (*.devtunnels.ms). Resolved bridge URI was ${initialResolution.toString(true)}.`);
+		throw new Error(
+			`Sidecar requires a public tunnel endpoint. None of the configured tunnel providers could establish one. ` +
+			`Install ngrok (${ngrokInstallUrl}) or Azure Dev Tunnels (${devTunnelInstallUrl}) and try again.`
+		);
+	}
+
+	private async tryBootstrapTunnel(localBridgeUri: vscode.Uri, provider: TunnelProvider): Promise<vscode.Uri | undefined> {
+		if (provider === 'ngrok') {
+			return this.tryBootstrapNgrok(localBridgeUri);
+		}
+		return this.tryBootstrapDevTunnel(localBridgeUri);
 	}
 
 	private async tryBootstrapDevTunnel(localBridgeUri: vscode.Uri): Promise<vscode.Uri | undefined> {
@@ -426,17 +480,178 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 
 		if (directHostAttempt.failureReason) {
 			if (isDevTunnelCliMissingReason(directHostAttempt.failureReason)) {
-				void this.showDevTunnelInstallPrompt(directHostAttempt.failureReason).catch(error => {
+				void this.showInstallPrompt('devtunnel', directHostAttempt.failureReason, devTunnelInstallUrl).catch(error => {
 					this.logService.warn(`[Sidecar] Failed to show devtunnel install prompt: ${error instanceof Error ? error.message : String(error)}`);
 				});
 			} else {
-				void this.showDevTunnelStartupWarning(directHostAttempt.failureReason).catch(error => {
+				void this.showTunnelStartupWarning('devtunnel', directHostAttempt.failureReason).catch(error => {
 					this.logService.warn(`[Sidecar] Failed to show devtunnel startup warning: ${error instanceof Error ? error.message : String(error)}`);
 				});
 			}
 		}
 
 		return undefined;
+	}
+
+	private async tryBootstrapNgrok(localBridgeUri: vscode.Uri): Promise<vscode.Uri | undefined> {
+		const attempt = await this.tryStartNgrokProcess(localBridgeUri);
+		if (attempt.uri) {
+			return attempt.uri;
+		}
+
+		if (attempt.failureReason) {
+			if (isDevTunnelCliMissingReason(attempt.failureReason)) {
+				// Don't block — just notify. The caller will fall back to devtunnel.
+				void this.showInstallPrompt('ngrok', attempt.failureReason, ngrokInstallUrl).catch(error => {
+					this.logService.warn(`[Sidecar] Failed to show ngrok install prompt: ${error instanceof Error ? error.message : String(error)}`);
+				});
+			} else {
+				this.logService.warn(`[Sidecar] ngrok did not become ready: ${attempt.failureReason}`);
+			}
+		}
+
+		return undefined;
+	}
+
+	private async tryStartNgrokProcess(localBridgeUri: vscode.Uri): Promise<TunnelHostAttemptResult> {
+		const port = getUriPort(localBridgeUri);
+		if (!port) {
+			this.logService.warn(`[Sidecar] Unable to determine local bridge port for ngrok bootstrap: ${localBridgeUri.toString(true)}`);
+			return { uri: undefined, failureReason: undefined };
+		}
+
+		let ngrokProcess: ChildProcessWithoutNullStreams;
+		try {
+			// `--log=stdout` ensures structured log lines come through stdout so we can parse them.
+			ngrokProcess = spawn(ngrokExecutableName, ['http', `${port}`, '--log=stdout', '--log-format=json']);
+		} catch (error) {
+			const reason = error instanceof Error ? error.message : String(error);
+			this.logService.warn(`[Sidecar] Failed to launch ngrok process: ${reason}`);
+			return { uri: undefined, failureReason: reason };
+		}
+
+		const readyResult = await this.waitForNgrokUri(ngrokProcess);
+		if (!readyResult.uri) {
+			this.terminateDevTunnelProcess(ngrokProcess);
+			if (readyResult.failureReason) {
+				this.logService.warn(`[Sidecar] ngrok did not produce a public URL: ${readyResult.failureReason}`);
+			}
+			return readyResult;
+		}
+
+		// Reuse the same lifecycle field — only one tunnel process runs at a time.
+		this.devTunnelHostProcess = ngrokProcess;
+		this.attachDevTunnelHostLifecycle(ngrokProcess);
+		this.logService.info(`[Sidecar] ngrok ready at ${readyResult.uri.toString(true)}`);
+		return readyResult;
+	}
+
+	private waitForNgrokUri(ngrokProcess: ChildProcessWithoutNullStreams): Promise<TunnelHostAttemptResult> {
+		return new Promise(resolve => {
+			let settled = false;
+			let outputBuffer = '';
+
+			const settle = (result: TunnelHostAttemptResult): void => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				clearTimeout(timeout);
+				ngrokProcess.stdout.off('data', onData);
+				ngrokProcess.stderr.off('data', onData);
+				ngrokProcess.off('error', onError);
+				ngrokProcess.off('exit', onExit);
+				resolve(result);
+			};
+
+			const tryExtractNgrokUrl = (chunk: Buffer | string): vscode.Uri | undefined => {
+				const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+				if (text.trim()) {
+					this.logService.trace(`[Sidecar][ngrok] ${text.trim()}`);
+				}
+
+				outputBuffer = `${outputBuffer}${text}`;
+
+				// ngrok v3: JSON log lines contain `{..."url":"https://xxxx.ngrok-free.app"...}`
+				for (const line of outputBuffer.split('\n')) {
+					const trimmed = line.trim();
+					if (!trimmed.startsWith('{')) {
+						continue;
+					}
+					try {
+						const obj = JSON.parse(trimmed) as Record<string, unknown>;
+						// ngrok v3 emits `msg:"started tunnel"` with `url` field
+						const url = typeof obj.url === 'string' ? obj.url : undefined;
+						// Also handle `addr` (ngrok v2 JSON output uses `Addr` / `URL`)
+						const urlAlt = typeof obj.URL === 'string' ? obj.URL : undefined;
+						const candidate = url ?? urlAlt;
+						if (candidate) {
+							try {
+								const parsed = vscode.Uri.parse(candidate);
+								if (isPublicTunnelUri(parsed)) {
+									return parsed;
+								}
+							} catch {
+								// ignore parse errors
+							}
+						}
+					} catch {
+						// not valid JSON — skip
+					}
+				}
+
+				// Fallback: plain-text URL scan (ngrok v2 without --log-format=json)
+				const matches = outputBuffer.match(devTunnelUrlPattern);
+				if (matches) {
+					for (let i = matches.length - 1; i >= 0; i--) {
+						const candidate = matches[i].replace(/[),.;]+$/, '');
+						if (candidate.includes('ngrok')) {
+							try {
+								const parsed = vscode.Uri.parse(candidate);
+								if (isPublicTunnelUri(parsed)) {
+									return parsed;
+								}
+							} catch {
+								// ignore
+							}
+						}
+					}
+				}
+
+				return undefined;
+			};
+
+			const onData = (chunk: Buffer | string) => {
+				const uri = tryExtractNgrokUrl(chunk);
+				if (uri) {
+					settle({ uri, failureReason: undefined });
+				}
+			};
+
+			const onError = (error: Error) => {
+				let failureReason = error.message;
+				if (failureReason.includes('ENOENT')) {
+					failureReason = l10n.t('ngrok CLI is not installed or not available on PATH');
+				}
+				settle({ uri: undefined, failureReason });
+			};
+
+			const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+				const failureReason = code === 0
+					? l10n.t('ngrok exited before publishing a public endpoint')
+					: l10n.t('ngrok exited with code {0}{1}', code ?? 'unknown', signal ? ` (${signal})` : '');
+				settle({ uri: undefined, failureReason });
+			};
+
+			const timeout = setTimeout(() => {
+				settle({ uri: undefined, failureReason: l10n.t('timed out waiting for ngrok to publish a public endpoint') });
+			}, ngrokStartupTimeoutMs);
+
+			ngrokProcess.stdout.on('data', onData);
+			ngrokProcess.stderr.on('data', onData);
+			ngrokProcess.once('error', onError);
+			ngrokProcess.once('exit', onExit);
+		});
 	}
 
 	private async tryStartDirectDevTunnelHost(localBridgeUri: vscode.Uri): Promise<DevTunnelHostAttemptResult> {
@@ -634,27 +849,30 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 		this.terminateDevTunnelProcess(devTunnelHostProcess);
 	}
 
-	private async showDevTunnelInstallPrompt(reason: string): Promise<void> {
-		const normalizedReason = reason.trim();
-		const renderedReason = normalizedReason.length > 0
-			? normalizedReason
-			: l10n.t('unknown reason');
+	private async showInstallPrompt(tool: string, reason: string, installUrl: string): Promise<void> {
+		const normalizedReason = reason.trim() || l10n.t('unknown reason');
 		const selected = await vscode.window.showWarningMessage(
-			l10n.t('Sidecar requires the devtunnel CLI, but it was not detected ({0}).', renderedReason),
-			l10n.t('Install Dev Tunnels')
+			l10n.t('Sidecar requires the {0} CLI, but it was not detected ({1}).', tool, normalizedReason),
+			l10n.t('Install {0}', tool)
 		);
-
 		if (selected) {
-			void vscode.env.openExternal(vscode.Uri.parse(devTunnelInstallUrl));
+			void vscode.env.openExternal(vscode.Uri.parse(installUrl));
 		}
 	}
 
+	private async showTunnelStartupWarning(tool: string, reason: string): Promise<void> {
+		const normalizedReason = reason.trim() || l10n.t('unknown reason');
+		await vscode.window.showWarningMessage(l10n.t('Sidecar could not start a tunnel via {0} ({1}).', tool, normalizedReason));
+	}
+
+	/** @deprecated Use {@link showInstallPrompt} instead. */
+	private async showDevTunnelInstallPrompt(reason: string): Promise<void> {
+		return this.showInstallPrompt('devtunnel', reason, devTunnelInstallUrl);
+	}
+
+	/** @deprecated Use {@link showTunnelStartupWarning} instead. */
 	private async showDevTunnelStartupWarning(reason: string): Promise<void> {
-		const normalizedReason = reason.trim();
-		const renderedReason = normalizedReason.length > 0
-			? normalizedReason
-			: l10n.t('unknown reason');
-		await vscode.window.showWarningMessage(l10n.t('Sidecar could not start a direct dev tunnel ({0}).', renderedReason));
+		return this.showTunnelStartupWarning('devtunnel', reason);
 	}
 
 	private async isBridgeEndpointUsable(candidateUri: vscode.Uri, source: string): Promise<boolean> {
@@ -662,8 +880,10 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 			return false;
 		}
 
-		if (!isDevTunnelsHost(getUriHostname(candidateUri))) {
-			this.logService.warn(`[Sidecar] Ignoring tunnel endpoint from ${source}; Sidecar requires a devtunnels.ms endpoint for WebSocket support (${candidateUri.toString(true)}).`);
+		const host = getUriHostname(candidateUri);
+		// Accept known tunnel providers; reject unknown public URIs (may be unrelated VS Code Remote hosts).
+		if (!isDevTunnelsHost(host) && !isNgrokHost(host)) {
+			this.logService.warn(`[Sidecar] Ignoring tunnel endpoint from ${source}; host is not a recognised tunnel provider (${candidateUri.toString(true)}).`);
 			return false;
 		}
 
@@ -781,16 +1001,17 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 		try {
 			await this.startSidecar();
 		} catch (error) {
-			if (error instanceof Error && (error.message.includes(devTunnelDomainSuffix) || error.message.includes('dev tunnel'))) {
-				const actionLabel = isDevTunnelCliMissingReason(error.message)
-					? l10n.t('Install Dev Tunnels')
-					: l10n.t('Open Dev Tunnels Docs');
+			const message = error instanceof Error ? error.message : String(error);
+			if (message.includes('tunnel') || message.includes('ngrok') || message.includes('devtunnel')) {
 				const selected = await vscode.window.showErrorMessage(
-					l10n.t('Sidecar requires a dev tunnel endpoint to pair. Install or configure dev tunnels and try again.'),
-					actionLabel
+					l10n.t('Sidecar requires a public tunnel to pair. Install ngrok or Azure Dev Tunnels and try again.'),
+					l10n.t('Get ngrok'),
+					l10n.t('Get Dev Tunnels')
 				);
 
-				if (selected) {
+				if (selected === l10n.t('Get ngrok')) {
+					void vscode.env.openExternal(vscode.Uri.parse(ngrokInstallUrl));
+				} else if (selected === l10n.t('Get Dev Tunnels')) {
 					void vscode.env.openExternal(vscode.Uri.parse(devTunnelInstallUrl));
 				}
 				return;

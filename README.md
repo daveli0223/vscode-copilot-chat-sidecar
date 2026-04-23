@@ -49,14 +49,107 @@ If you just want to run Sidecar without setting up the full dev environment, you
 
 4. Accept the default URL (`https://davidobot.net/vscode-copilot-chat-sidecar/`) unless you're self-hosting; this is just the visual layer
 
+## Tunnel Setup
+
+Sidecar needs a public HTTPS/WebSocket tunnel so your phone can reach the local bridge server running on your desktop. Two tunnel providers are supported. **ngrok is the default.**
+
+---
+
+### Option A: ngrok (recommended, default)
+
+ngrok v3 works out of the box on macOS, Linux, and Windows and requires no Microsoft account.
+
+#### 1. Install ngrok
+
+| Platform | Command |
+|----------|---------|
+| macOS (Homebrew) | `brew install ngrok/ngrok/ngrok` |
+| Linux (snap) | `snap install ngrok` |
+| Windows (Chocolatey) | `choco install ngrok` |
+| Any platform | Download from [ngrok.com/download](https://ngrok.com/download) and put `ngrok` on your `PATH` |
+
+#### 2. Create a free account and add your auth token
+
+A free account is enough. Register at [dashboard.ngrok.com](https://dashboard.ngrok.com/signup), copy your auth token, then run:
+
+```bash
+ngrok config add-authtoken <YOUR_AUTH_TOKEN>
+```
+
+This writes the token to `~/.config/ngrok/ngrok.yml` and is a one-time step. Without it ngrok still works but only one tunnel session per machine is allowed, and the URL changes every restart.
+
+#### 3. Verify the install
+
+```bash
+ngrok version
+# ngrok version 3.x.x
+```
+
+Sidecar will now automatically run `ngrok http <port>` when you click **Sidecar** in the status bar.
+
+---
+
+### Option B: Azure Dev Tunnels
+
+Dev Tunnels is Microsoft's tunnel service and is built into VS Code Remote. It requires a Microsoft or GitHub account.
+
+#### 1. Install the Dev Tunnels CLI
+
+| Platform | Command |
+|----------|---------|
+| macOS (Homebrew) | `brew install devtunnel` |
+| Linux | `curl -sL https://aka.ms/DevTunnelCliInstall \| bash` |
+| Windows (winget) | `winget install Microsoft.devtunnel` |
+
+Full guide: [learn.microsoft.com/azure/developer/dev-tunnels/get-started](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/get-started)
+
+#### 2. Sign in
+
+```bash
+devtunnel user login
+# Follow the browser prompt to sign in with Microsoft or GitHub.
+```
+
+#### 3. Verify the install
+
+```bash
+devtunnel --version
+```
+
+#### 4. Select Dev Tunnels as the provider
+
+Open VS Code Settings, search for **Sidecar tunnel**, and set `github.copilot.sidecar.tunnelProvider` to `devtunnel`.
+
+Or edit `settings.json` directly:
+
+```json
+"github.copilot.sidecar.tunnelProvider": "devtunnel"
+```
+
+---
+
+### Choosing a provider
+
+| | ngrok | Azure Dev Tunnels |
+|---|---|---|
+| Account required | Free ngrok account | Microsoft / GitHub account |
+| Default | ✅ yes | no |
+| Free tier limits | 1 online agent, URL changes on restart without a fixed domain | unlimited tunnels, URL changes on restart |
+| WebSocket support | ✅ yes | ✅ yes |
+| Auth-token one-time setup | ✅ yes | ✅ yes (browser login) |
+| macOS / Linux / Windows | ✅ | ✅ |
+
+Set `github.copilot.sidecar.tunnelProvider` to `auto` to try ngrok first and automatically fall back to Dev Tunnels if ngrok is unavailable.
+
+---
+
 ## Development
 
 ### Sidecar architecture
 
 - The extension starts a local HTTP + WebSocket bridge server on localhost.
-- Sidecar bootstraps Dev Tunnels directly by running `devtunnel host -p <port> --allow-anonymous` and using the resulting `*.devtunnels.ms` endpoint.
-- If direct devtunnel bootstrap is unavailable or fails, Sidecar prompts you to [install it](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/get-started).
-- A QR code in VS Code opens the PWA with a signed pairing URL (`ws` + session `token`).
+- When you click **Sidecar** in the status bar, it spawns the configured tunnel provider (ngrok by default), reads the public URL from its output, and builds a signed pairing URL.
+- A QR code in VS Code opens the PWA with that pairing URL (`ws` + session `token`).
 - The phone PWA syncs conversation list, history, and streaming assistant chunks.
 - Prompts sent from the phone are forwarded back into Copilot Chat on desktop.
 - The status bar entry is `Sidecar` on the **bottom-right-hand-corner** of your window:
@@ -111,7 +204,7 @@ You can test without deploying GitHub Pages.
 
    - Disable the official GitHub Copilot Chat extension to avoid conflicts.
    - Sign in to GitHub Copilot.
-   - Install [Azure Dev Tunnels CLI](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/get-started) and sign in for direct tunnel bootstrap:
+   - Set up a tunnel provider — see [Tunnel Setup](#tunnel-setup) above. ngrok is the default; install it and add your auth token before this step.
    - Open a workspace and open the Chat view.
 
 4. In the status bar, confirm Sidecar starts in disconnected state (`$(debug-disconnect) Sidecar`).
@@ -136,7 +229,9 @@ You can test without deploying GitHub Pages.
    - Confirm status changes to reconnecting, then connected, and conversation list refreshes.
 
 10. If pairing fails:
-   - Verify `devtunnel` CLI is installed and signed in.
+   - Verify your tunnel CLI is installed, on `PATH`, and authenticated (`ngrok config check` or `devtunnel user show`).
+   - Check the Sidecar panel — if it shows a loopback warning, the tunnel did not start. Open the Output panel and select **GitHub Copilot Chat** for details.
+   - Switch provider: set `github.copilot.sidecar.tunnelProvider` to `devtunnel` (or `ngrok`) in settings and try again.
    - Regenerate token from the Sidecar panel and rescan.
    - Reopen the Sidecar panel to refresh the pairing URL.
 

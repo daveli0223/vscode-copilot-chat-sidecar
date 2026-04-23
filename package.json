@@ -2890,6 +2890,21 @@
 				"title": "GitHub Copilot Chat",
 				"id": "stable",
 				"properties": {
+					"github.copilot.sidecar.tunnelProvider": {
+						"type": "string",
+						"enum": [
+							"auto",
+							"ngrok",
+							"devtunnel"
+						],
+						"enumDescriptions": [
+							"Try ngrok first, then fall back to Azure Dev Tunnels.",
+							"Use ngrok to expose the local bridge server.",
+							"Use Azure Dev Tunnels to expose the local bridge server."
+						],
+						"default": "ngrok",
+						"description": "Tunnel provider used by Sidecar to make the local bridge server reachable from your phone. ngrok is the default."
+					},
 					"github.copilot.chat.backgroundAgent.enabled": {
 						"type": "boolean",
 						"default": true,
