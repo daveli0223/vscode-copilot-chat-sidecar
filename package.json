@@ -2895,11 +2895,13 @@
 						"enum": [
 							"auto",
 							"ngrok",
+							"cloudflare",
 							"devtunnel"
 						],
 						"enumDescriptions": [
-							"Try ngrok first, then fall back to Azure Dev Tunnels.",
+							"Try ngrok first, then cloudflared, then Azure Dev Tunnels.",
 							"Use ngrok to expose the local bridge server.",
+							"Use Cloudflare Tunnel (cloudflared) — no account needed for quick tunnels.",
 							"Use Azure Dev Tunnels to expose the local bridge server."
 						],
 						"default": "ngrok",

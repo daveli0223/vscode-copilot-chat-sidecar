@@ -89,7 +89,42 @@ Sidecar will now automatically run `ngrok http <port>` when you click **Sidecar*
 
 ---
 
-### Option B: Azure Dev Tunnels
+### Option B: Cloudflare Tunnel (no account required)
+
+`cloudflared tunnel --url` creates a temporary public tunnel instantly — no Cloudflare account or login needed.
+
+#### 1. Install cloudflared
+
+| Platform | Command |
+|----------|---------|
+| macOS (Homebrew) | `brew install cloudflared` |
+| Linux (Debian/Ubuntu) | See [Cloudflare downloads page](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) |
+| Windows (Chocolatey) | `choco install cloudflared` |
+| Windows (winget) | `winget install Cloudflare.cloudflared` |
+| Any platform | Download from [developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) |
+
+#### 2. Verify the install
+
+```bash
+cloudflared --version
+# cloudflared version 2024.x.x
+```
+
+No login or auth token required for quick tunnels.
+
+#### 3. Select Cloudflare as the provider
+
+```json
+"github.copilot.sidecar.tunnelProvider": "cloudflare"
+```
+
+Sidecar will automatically run `cloudflared tunnel --url http://localhost:<port>` and parse the `*.trycloudflare.com` URL from its output.
+
+> **Note:** Quick tunnel URLs change every restart. For a persistent subdomain, set up a named Cloudflare Tunnel with `cloudflared tunnel create` — but that requires a Cloudflare account.
+
+---
+
+### Option C: Azure Dev Tunnels
 
 Dev Tunnels is Microsoft's tunnel service and is built into VS Code Remote. It requires a Microsoft or GitHub account.
 
@@ -130,16 +165,115 @@ Or edit `settings.json` directly:
 
 ### Choosing a provider
 
-| | ngrok | Azure Dev Tunnels |
-|---|---|---|
-| Account required | Free ngrok account | Microsoft / GitHub account |
-| Default | ✅ yes | no |
-| Free tier limits | 1 online agent, URL changes on restart without a fixed domain | unlimited tunnels, URL changes on restart |
-| WebSocket support | ✅ yes | ✅ yes |
-| Auth-token one-time setup | ✅ yes | ✅ yes (browser login) |
-| macOS / Linux / Windows | ✅ | ✅ |
+| | ngrok | Cloudflare Tunnel | Azure Dev Tunnels |
+|---|---|---|---|
+| Account required | Free ngrok account | ❌ none for quick tunnels | Microsoft / GitHub account |
+| Default | ✅ yes | no | no |
+| Free tier limits | 1 online agent, URL changes on restart without a fixed domain | URL changes on restart | unlimited tunnels, URL changes on restart |
+| WebSocket support | ✅ yes | ✅ yes | ✅ yes |
+| Auth setup | Token once (`ngrok config add-authtoken`) | None | Browser login once |
+| macOS / Linux / Windows | ✅ | ✅ | ✅ |
 
-Set `github.copilot.sidecar.tunnelProvider` to `auto` to try ngrok first and automatically fall back to Dev Tunnels if ngrok is unavailable.
+Set `github.copilot.sidecar.tunnelProvider` to `auto` to try ngrok → cloudflare → Dev Tunnels automatically.
+
+---
+
+## End-to-end Setup Guide
+
+This walks you through getting Sidecar working from a clean machine.
+
+### Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| Node.js 22+ | `node --version` |
+| npm 10+ (bundled with Node) | `npm --version` |
+| VS Code or VS Code Insiders | Insiders preferred for proposed APIs |
+| GitHub Copilot subscription | Active seat required |
+| A tunnel provider | ngrok (default), cloudflared, or Azure Dev Tunnels — pick one from [Tunnel Setup](#tunnel-setup) |
+
+---
+
+### Step 1 — Install a tunnel provider
+
+**Fastest (no account): cloudflared**
+
+```bash
+brew install cloudflared        # macOS
+# winget install Cloudflare.cloudflared   # Windows
+cloudflared --version
+```
+
+Then set the provider in VS Code settings:
+
+```json
+"github.copilot.sidecar.tunnelProvider": "cloudflare"
+```
+
+**Or use ngrok (default, free account required):**
+
+```bash
+brew install ngrok/ngrok/ngrok
+ngrok config add-authtoken <YOUR_TOKEN>   # get token at dashboard.ngrok.com
+ngrok version   # should print 3.x.x
+```
+
+---
+
+### Step 2 — Build and install the extension
+
+```bash
+cd /path/to/vscode-copilot-chat-sidecar
+npm ci
+npm run compile && npx vsce package --out copilot-chat-sidecar.vsix --allow-package-secrets sendgrid
+code-insiders --install-extension copilot-chat-sidecar.vsix --force
+# or: code --install-extension copilot-chat-sidecar.vsix --force
+```
+
+Or run the VS Code task **Package & Install VSIX** (Terminal → Run Task).
+
+---
+
+### Step 3 — Launch VS Code and configure
+
+1. **Disable** the official `GitHub Copilot Chat` extension (Extensions sidebar → search "Copilot Chat" → Disable).
+2. **Reload** VS Code (Cmd+Shift+P → "Developer: Reload Window").
+3. **Sign in** to GitHub Copilot when prompted in the bottom-left corner.
+4. Confirm the status bar shows `$(debug-disconnect) Sidecar` in the bottom-right corner.
+
+---
+
+### Step 4 — Pair your phone
+
+1. Click **Sidecar** in the status bar.
+2. Wait a few seconds — your tunnel provider starts automatically.
+3. A panel opens with a QR code. The default PWA URL is `https://davidobot.net/vscode-copilot-chat-sidecar/`.
+4. Scan the QR code from your phone's camera app.
+5. The PWA opens in your phone browser and connects automatically.
+6. The status bar updates to `$(device-mobile) Sidecar`.
+
+---
+
+### Step 5 — Validate
+
+- Open a conversation in desktop Copilot Chat — it should appear in the phone's conversation list.
+- Click a conversation on the phone to load its history.
+- Type a message on the phone and send — it appears in the desktop chat and gets a response.
+- The response streams live on the phone.
+
+---
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Status bar shows a loopback warning | Tunnel didn't start — check the Output panel (GitHub Copilot Chat), verify the CLI is on PATH |
+| Cloudflared not found | Run `brew install cloudflared` or download from [Cloudflare downloads](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) |
+| ngrok auth error | Run `ngrok config add-authtoken <token>` with a valid token from [dashboard.ngrok.com](https://dashboard.ngrok.com) |
+| Phone shows "Connection failed" | Ensure phone and desktop have internet; scan a fresh QR from the panel |
+| Conversations missing from phone | Known limitation: provider-backed sessions (Claude Code, Copilot CLI) show in list but history is empty |
+| Want to switch providers | Set `github.copilot.sidecar.tunnelProvider` to `cloudflare`, `ngrok`, or `devtunnel` in settings |
+| Panel shows wrong URL | Click **Set PWA URL** in the Sidecar panel and paste `https://davidobot.net/vscode-copilot-chat-sidecar/` |
 
 ---
 
@@ -231,7 +365,7 @@ You can test without deploying GitHub Pages.
 10. If pairing fails:
    - Verify your tunnel CLI is installed, on `PATH`, and authenticated (`ngrok config check` or `devtunnel user show`).
    - Check the Sidecar panel — if it shows a loopback warning, the tunnel did not start. Open the Output panel and select **GitHub Copilot Chat** for details.
-   - Switch provider: set `github.copilot.sidecar.tunnelProvider` to `devtunnel` (or `ngrok`) in settings and try again.
+   - Switch provider: set `github.copilot.sidecar.tunnelProvider` to `cloudflare`, `devtunnel`, or `ngrok` in settings and try again.
    - Regenerate token from the Sidecar panel and rescan.
    - Reopen the Sidecar panel to refresh the pairing URL.
 

@@ -27,8 +27,12 @@ const devTunnelInstallUrl = 'https://learn.microsoft.com/en-us/azure/developer/d
 const devTunnelExecutableName = 'devtunnel';
 const ngrokExecutableName = 'ngrok';
 const ngrokInstallUrl = 'https://ngrok.com/download';
+const cloudflaredExecutableName = 'cloudflared';
+const cloudflaredInstallUrl = 'https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/';
+const cloudflaredDomainSuffix = '.trycloudflare.com';
 const devTunnelStartupTimeoutMs = 15000;
 const ngrokStartupTimeoutMs = 15000;
+const cloudflaredStartupTimeoutMs = 20000;
 const devTunnelOutputBufferLimit = 16000;
 const bridgeEndpointProbeTimeoutMs = 4000;
 const bridgeEndpointProbeMaxBodyBytes = 12000;
@@ -36,7 +40,7 @@ const bridgeEndpointProbeSignature = 'Copilot Sidecar Bridge';
 const devTunnelUrlPattern = /https?:\/\/[^\s"'<>`]+/g;
 
 /** Allowed values for the `github.copilot.sidecar.tunnelProvider` setting. */
-type TunnelProvider = 'auto' | 'ngrok' | 'devtunnel';
+type TunnelProvider = 'auto' | 'ngrok' | 'devtunnel' | 'cloudflare';
 const tunnelProviderSettingKey = 'github.copilot.sidecar.tunnelProvider';
 const defaultTunnelProvider: TunnelProvider = 'ngrok';
 
@@ -95,6 +99,15 @@ function isNgrokHost(host: string | undefined): boolean {
 	return normalizedHost.endsWith('.ngrok-free.app')
 		|| normalizedHost.endsWith('.ngrok.io')
 		|| normalizedHost.endsWith('.ngrok.app');
+}
+
+function isCloudflareHost(host: string | undefined): boolean {
+	if (!host) {
+		return false;
+	}
+
+	const normalizedHost = host.trim().toLowerCase();
+	return normalizedHost.endsWith(cloudflaredDomainSuffix);
 }
 
 function isPublicTunnelUri(uri: vscode.Uri): boolean {
@@ -432,7 +445,7 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 	/** Read the configured tunnel provider, defaulting to ngrok. */
 	private getConfiguredTunnelProvider(): TunnelProvider {
 		const value = vscode.workspace.getConfiguration().get<string>(tunnelProviderSettingKey, defaultTunnelProvider);
-		if (value === 'devtunnel' || value === 'ngrok' || value === 'auto') {
+		if (value === 'devtunnel' || value === 'ngrok' || value === 'auto' || value === 'cloudflare') {
 			return value;
 		}
 		return defaultTunnelProvider;
@@ -447,11 +460,14 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 
 		// 2. Try configured / default provider then fall back to the other.
 		const preferred = this.getConfiguredTunnelProvider();
-		const ordered: ReadonlyArray<TunnelProvider> = preferred === 'devtunnel'
-			? ['devtunnel', 'ngrok']
-			: ['ngrok', 'devtunnel'];
 
-		for (const provider of (preferred === 'auto' ? ['ngrok', 'devtunnel'] as const : ordered)) {
+		// 'auto' tries all three in a sensible order (no-auth providers first).
+		const autoOrder: ReadonlyArray<TunnelProvider> = ['ngrok', 'cloudflare', 'devtunnel'];
+		const ordered: ReadonlyArray<TunnelProvider> = preferred === 'auto'
+			? autoOrder
+			: [preferred, ...autoOrder.filter(p => p !== preferred)];
+
+		for (const provider of ordered) {
 			const uri = await this.tryBootstrapTunnel(localBridgeUri, provider);
 			if (uri) {
 				this.activeTunnelProvider = provider;
@@ -461,7 +477,7 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 
 		throw new Error(
 			`Sidecar requires a public tunnel endpoint. None of the configured tunnel providers could establish one. ` +
-			`Install ngrok (${ngrokInstallUrl}) or Azure Dev Tunnels (${devTunnelInstallUrl}) and try again.`
+			`Install ngrok (${ngrokInstallUrl}), cloudflared (${cloudflaredInstallUrl}), or Azure Dev Tunnels (${devTunnelInstallUrl}) and try again.`
 		);
 	}
 
@@ -469,7 +485,143 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 		if (provider === 'ngrok') {
 			return this.tryBootstrapNgrok(localBridgeUri);
 		}
+		if (provider === 'cloudflare') {
+			return this.tryBootstrapCloudflare(localBridgeUri);
+		}
 		return this.tryBootstrapDevTunnel(localBridgeUri);
+	}
+
+	private async tryBootstrapCloudflare(localBridgeUri: vscode.Uri): Promise<vscode.Uri | undefined> {
+		const attempt = await this.tryStartCloudflaredProcess(localBridgeUri);
+		if (attempt.uri) {
+			return attempt.uri;
+		}
+
+		if (attempt.failureReason) {
+			if (isDevTunnelCliMissingReason(attempt.failureReason)) {
+				// Non-blocking — caller will fall back to devtunnel.
+				void this.showInstallPrompt('cloudflared', attempt.failureReason, cloudflaredInstallUrl).catch(error => {
+					this.logService.warn(`[Sidecar] Failed to show cloudflared install prompt: ${error instanceof Error ? error.message : String(error)}`);
+				});
+			} else {
+				this.logService.warn(`[Sidecar] cloudflared did not become ready: ${attempt.failureReason}`);
+			}
+		}
+
+		return undefined;
+	}
+
+	private async tryStartCloudflaredProcess(localBridgeUri: vscode.Uri): Promise<TunnelHostAttemptResult> {
+		const port = getUriPort(localBridgeUri);
+		if (!port) {
+			this.logService.warn(`[Sidecar] Unable to determine local bridge port for cloudflared bootstrap: ${localBridgeUri.toString(true)}`);
+			return { uri: undefined, failureReason: undefined };
+		}
+
+		let cloudflaredProcess: ChildProcessWithoutNullStreams;
+		try {
+			// `tunnel --url` starts an unauthenticated quick tunnel — no Cloudflare account needed.
+			cloudflaredProcess = spawn(cloudflaredExecutableName, ['tunnel', '--url', `http://localhost:${port}`]);
+		} catch (error) {
+			const reason = error instanceof Error ? error.message : String(error);
+			this.logService.warn(`[Sidecar] Failed to launch cloudflared process: ${reason}`);
+			return { uri: undefined, failureReason: reason };
+		}
+
+		const readyResult = await this.waitForCloudflaredUri(cloudflaredProcess);
+		if (!readyResult.uri) {
+			this.terminateDevTunnelProcess(cloudflaredProcess);
+			if (readyResult.failureReason) {
+				this.logService.warn(`[Sidecar] cloudflared did not produce a public URL: ${readyResult.failureReason}`);
+			}
+			return readyResult;
+		}
+
+		// Reuse the same lifecycle field — only one tunnel process runs at a time.
+		this.devTunnelHostProcess = cloudflaredProcess;
+		this.attachDevTunnelHostLifecycle(cloudflaredProcess);
+		this.logService.info(`[Sidecar] cloudflared ready at ${readyResult.uri.toString(true)}`);
+		return readyResult;
+	}
+
+	private waitForCloudflaredUri(cloudflaredProcess: ChildProcessWithoutNullStreams): Promise<TunnelHostAttemptResult> {
+		return new Promise(resolve => {
+			let settled = false;
+			let outputBuffer = '';
+
+			const settle = (result: TunnelHostAttemptResult): void => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				clearTimeout(timeout);
+				cloudflaredProcess.stdout.off('data', onData);
+				cloudflaredProcess.stderr.off('data', onData);
+				cloudflaredProcess.off('error', onError);
+				cloudflaredProcess.off('exit', onExit);
+				resolve(result);
+			};
+
+			const tryExtractCloudflaredUrl = (chunk: Buffer | string): vscode.Uri | undefined => {
+				const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+				if (text.trim()) {
+					this.logService.trace(`[Sidecar][cloudflared] ${text.trim()}`);
+				}
+
+				outputBuffer = `${outputBuffer}${text}`;
+
+				// cloudflared prints the tunnel URL to stderr (and sometimes stdout).
+				// Scan all URLs in the buffer and accept any *.trycloudflare.com host.
+				const matches = outputBuffer.match(devTunnelUrlPattern);
+				if (matches) {
+					for (let i = matches.length - 1; i >= 0; i--) {
+						const candidate = matches[i].replace(/[),.;|\s]+$/, '');
+						try {
+							const parsed = vscode.Uri.parse(candidate);
+							const host = getUriHostname(parsed);
+							if (isCloudflareHost(host) && isPublicTunnelUri(parsed)) {
+								return parsed;
+							}
+						} catch {
+							// ignore parse errors
+						}
+					}
+				}
+
+				return undefined;
+			};
+
+			const onData = (chunk: Buffer | string) => {
+				const uri = tryExtractCloudflaredUrl(chunk);
+				if (uri) {
+					settle({ uri, failureReason: undefined });
+				}
+			};
+
+			const onError = (error: Error) => {
+				let failureReason = error.message;
+				if (failureReason.includes('ENOENT')) {
+					failureReason = l10n.t('cloudflared CLI is not installed or not available on PATH');
+				}
+				settle({ uri: undefined, failureReason });
+			};
+
+			const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+				const failureReason = code === 0
+					? l10n.t('cloudflared exited before publishing a public endpoint')
+					: l10n.t('cloudflared exited with code {0}{1}', code ?? 'unknown', signal ? ` (${signal})` : '');
+				settle({ uri: undefined, failureReason });
+			};
+
+			const timeout = setTimeout(() => {
+				settle({ uri: undefined, failureReason: l10n.t('timed out waiting for cloudflared to publish a public endpoint') });
+			}, cloudflaredStartupTimeoutMs);
+
+			cloudflaredProcess.stdout.on('data', onData);
+			cloudflaredProcess.stderr.on('data', onData);
+			cloudflaredProcess.once('error', onError);
+			cloudflaredProcess.once('exit', onExit);
+		});
 	}
 
 	private async tryBootstrapDevTunnel(localBridgeUri: vscode.Uri): Promise<vscode.Uri | undefined> {
@@ -865,16 +1017,6 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 		await vscode.window.showWarningMessage(l10n.t('Sidecar could not start a tunnel via {0} ({1}).', tool, normalizedReason));
 	}
 
-	/** @deprecated Use {@link showInstallPrompt} instead. */
-	private async showDevTunnelInstallPrompt(reason: string): Promise<void> {
-		return this.showInstallPrompt('devtunnel', reason, devTunnelInstallUrl);
-	}
-
-	/** @deprecated Use {@link showTunnelStartupWarning} instead. */
-	private async showDevTunnelStartupWarning(reason: string): Promise<void> {
-		return this.showTunnelStartupWarning('devtunnel', reason);
-	}
-
 	private async isBridgeEndpointUsable(candidateUri: vscode.Uri, source: string): Promise<boolean> {
 		if (!isPublicTunnelUri(candidateUri)) {
 			return false;
@@ -882,7 +1024,7 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 
 		const host = getUriHostname(candidateUri);
 		// Accept known tunnel providers; reject unknown public URIs (may be unrelated VS Code Remote hosts).
-		if (!isDevTunnelsHost(host) && !isNgrokHost(host)) {
+		if (!isDevTunnelsHost(host) && !isNgrokHost(host) && !isCloudflareHost(host)) {
 			this.logService.warn(`[Sidecar] Ignoring tunnel endpoint from ${source}; host is not a recognised tunnel provider (${candidateUri.toString(true)}).`);
 			return false;
 		}
