@@ -3,6 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+/* eslint-disable import/no-restricted-paths */
+
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ChatResult } from 'vscode';
 import { RawData, WebSocket } from 'ws';
@@ -37,8 +39,8 @@ import { IVSCodeExtensionContext } from '../../../extContext/common/extensionCon
 import { FileType } from '../../../filesystem/common/fileTypes';
 import { MockFileSystemService } from '../../../filesystem/node/test/mockFileSystemService';
 import { TestLogService } from '../../../testing/common/testLogService';
-import { BridgeConversationSummary, BridgeMessage, BridgeServer } from '../../bridgeServer';
-import { ConversationBridge } from '../../conversationBridge';
+import { BridgeConversationSummary, BridgeMessage, BridgeServer } from '../../node/bridgeServer';
+import { ConversationBridge } from '../../vscode-node/conversationBridge';
 
 class TestConversationStore implements IConversationStore {
 	readonly _serviceBrand: undefined;

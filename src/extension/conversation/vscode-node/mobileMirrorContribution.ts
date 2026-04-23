@@ -1,12 +1,12 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) David Khachaturov. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
 import { l10n } from 'vscode';
-import { BridgeServer } from '../../../platform/bridge/bridgeServer';
-import { ConversationBridge } from '../../../platform/bridge/conversationBridge';
+import { BridgeServer } from '../../../platform/bridge/node/bridgeServer';
+import { ConversationBridge } from '../../../platform/bridge/vscode-node/conversationBridge';
 import { IVSCodeExtensionContext } from '../../../platform/extContext/common/extensionContext';
 import { IFileSystemService } from '../../../platform/filesystem/common/fileSystemService';
 import { ILogService } from '../../../platform/log/common/logService';

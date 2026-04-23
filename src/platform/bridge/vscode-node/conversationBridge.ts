@@ -3,14 +3,16 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+/* eslint-disable import/no-restricted-paths */
+
 import * as vscode from 'vscode';
-import { IConversationStore, IConversationTurnArtifacts } from '../../extension/conversationStore/node/conversationStore';
-import { Disposable } from '../../util/vs/base/common/lifecycle';
-import { URI } from '../../util/vs/base/common/uri';
-import { IVSCodeExtensionContext } from '../extContext/common/extensionContext';
-import { IFileSystemService } from '../filesystem/common/fileSystemService';
-import { ILogService } from '../log/common/logService';
-import { BridgeAssistantTurnArtifacts, BridgeConversationFilter, BridgeConversationProvider, BridgeConversationStatus, BridgeConversationSummary, BridgeMessage, BridgeModelOption, BridgeModeOption, BridgeServer, BridgeTurnHistoryItem, BridgeUiCommandId } from './bridgeServer';
+import { IConversationStore, IConversationTurnArtifacts } from '../../../extension/conversationStore/node/conversationStore';
+import { Disposable } from '../../../util/vs/base/common/lifecycle';
+import { URI } from '../../../util/vs/base/common/uri';
+import { IVSCodeExtensionContext } from '../../extContext/common/extensionContext';
+import { IFileSystemService } from '../../filesystem/common/fileSystemService';
+import { ILogService } from '../../log/common/logService';
+import { BridgeAssistantTurnArtifacts, BridgeConversationFilter, BridgeConversationProvider, BridgeConversationStatus, BridgeConversationSummary, BridgeMessage, BridgeModelOption, BridgeModeOption, BridgeServer, BridgeTurnHistoryItem, BridgeUiCommandId } from '../node/bridgeServer';
 
 type GitRepositoryLike = {
 	readonly rootUri: vscode.Uri;

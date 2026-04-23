@@ -7,8 +7,8 @@ import { randomBytes } from 'crypto';
 import { createServer, Server as HttpServer, IncomingMessage, ServerResponse } from 'http';
 import { AddressInfo } from 'net';
 import { RawData, WebSocket, WebSocketServer } from 'ws';
-import { Emitter, Event } from '../../util/vs/base/common/event';
-import { Disposable } from '../../util/vs/base/common/lifecycle';
+import { Emitter, Event } from '../../../util/vs/base/common/event';
+import { Disposable } from '../../../util/vs/base/common/lifecycle';
 
 export interface BridgeConversationSummary {
 	readonly id: string;
