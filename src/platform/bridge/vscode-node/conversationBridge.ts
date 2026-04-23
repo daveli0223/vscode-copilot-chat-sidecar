@@ -535,6 +535,7 @@ export class ConversationBridge extends Disposable {
 	private async readWorkspaceChatSessionSummaryFromFile(fileUri: URI, sessionId: string): Promise<BridgeConversationSummary | undefined> {
 		try {
 			let text: string;
+			let isHeadOnly = false;
 			try {
 				const raw = await this.fileSystemService.readFile(fileUri);
 				text = this.textDecoder.decode(raw);
@@ -543,11 +544,20 @@ export class ConversationBridge extends Disposable {
 				// reading just the head of the file (first line has the title).
 				const SUMMARY_HEAD_BYTES = 64 * 1024; // 64 KB
 				text = await this.readFileHead(fileUri, SUMMARY_HEAD_BYTES);
+				isHeadOnly = true;
 			}
 
 			let title: string | undefined;
 			let provider: BridgeConversationProvider = 'local';
 			let status: BridgeConversationStatus = 'read';
+
+			// When we only have a truncated head, the kind=0 JSON line is almost
+			// certainly incomplete (first lines are often 170 KB – 6 MB).  Extract
+			// customTitle directly with a regex — it sits at ~byte 56, well within
+			// the 64 KB window — instead of relying on JSON.parse.
+			if (isHeadOnly) {
+				title = this.extractTitleFromRawText(text);
+			}
 
 			for (const line of text.split('\n')) {
 				if (!line.trim()) {
@@ -1519,6 +1529,34 @@ export class ConversationBridge extends Disposable {
 		}
 
 		return currentStatus;
+	}
+
+	/**
+	 * Extract a title from raw (possibly truncated) JSONL text using regex.
+	 * This is the fallback for files too large for readFile — the kind=0 first
+	 * line can be 170 KB – 6 MB, so JSON.parse fails on the truncated 64 KB
+	 * head.  customTitle always appears near byte 56, well within reach.
+	 *
+	 * Falls back to the first user message ("message":"…") if no customTitle.
+	 */
+	private extractTitleFromRawText(text: string): string | undefined {
+		// Try customTitle first — it's the user-assigned session name.
+		const customTitleMatch = text.match(/"customTitle"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+		if (customTitleMatch && customTitleMatch[1].trim().length > 0) {
+			return this.truncateConversationTitle(
+				customTitleMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\').trim()
+			);
+		}
+
+		// Fall back to the first user message text in the session.
+		const messageMatch = text.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+		if (messageMatch && messageMatch[1].trim().length > 0) {
+			return this.truncateConversationTitle(
+				messageMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\').trim()
+			);
+		}
+
+		return undefined;
 	}
 
 	private extractTitleFromSessionState(state: Record<string, unknown>): string | undefined {
