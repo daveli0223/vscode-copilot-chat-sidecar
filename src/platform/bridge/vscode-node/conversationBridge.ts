@@ -5,6 +5,7 @@
 
 /* eslint-disable import/no-restricted-paths */
 
+import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { IConversationStore, IConversationTurnArtifacts } from '../../../extension/conversationStore/node/conversationStore';
 import { Disposable } from '../../../util/vs/base/common/lifecycle';
@@ -310,10 +311,7 @@ export class ConversationBridge extends Disposable {
 
 	private async sendSnapshot(respond: (message: BridgeMessage) => void, filter?: BridgeConversationFilter): Promise<void> {
 		const conversations = await this.getConversationSummaries(filter);
-		this.logService.info(`[ConversationBridge] sendSnapshot: ${conversations.length} conversations`);
-		for (const c of conversations.slice(0, 5)) {
-			this.logService.info(`[ConversationBridge]   - ${c.id}: "${c.title}" (${c.provider}, ${c.status})`);
-		}
+		this.logService.trace(`[ConversationBridge] sendSnapshot: ${conversations.length} conversations`);
 		respond({
 			type: 'conversation:list',
 			conversations,
@@ -323,7 +321,7 @@ export class ConversationBridge extends Disposable {
 
 	private async broadcastConversationList(): Promise<void> {
 		const conversations = await this.getConversationSummaries();
-		this.logService.info(`[ConversationBridge] broadcastConversationList: ${conversations.length} conversations`);
+		this.logService.trace(`[ConversationBridge] broadcastConversationList: ${conversations.length} conversations`);
 		this.bridgeServer.broadcast({
 			type: 'conversation:list',
 			conversations,
@@ -490,10 +488,35 @@ export class ConversationBridge extends Disposable {
 		return [this.workspaceChatSessionsDirUri];
 	}
 
+	/**
+	 * Read the first {@link SUMMARY_HEAD_BYTES} bytes of a session file.
+	 * This is enough to capture the kind=0 initial-state line that contains
+	 * the customTitle and model info, without pulling multi-MB transcripts
+	 * into memory (the IFileSystemService read-limit is 5 MB).
+	 */
+	private async readFileHead(fileUri: URI, maxBytes: number): Promise<string> {
+		const fd = await fs.promises.open(fileUri.fsPath, 'r');
+		try {
+			const buf = Buffer.alloc(maxBytes);
+			const { bytesRead } = await fd.read(buf, 0, maxBytes, 0);
+			return buf.toString('utf-8', 0, bytesRead);
+		} finally {
+			await fd.close();
+		}
+	}
+
 	private async readWorkspaceChatSessionSummaryFromFile(fileUri: URI, sessionId: string): Promise<BridgeConversationSummary | undefined> {
 		try {
-			const raw = await this.fileSystemService.readFile(fileUri);
-			const text = this.textDecoder.decode(raw);
+			let text: string;
+			try {
+				const raw = await this.fileSystemService.readFile(fileUri);
+				text = this.textDecoder.decode(raw);
+			} catch {
+				// File likely exceeds the 5 MB readFile limit — fall back to
+				// reading just the head of the file (first line has the title).
+				const SUMMARY_HEAD_BYTES = 64 * 1024; // 64 KB
+				text = await this.readFileHead(fileUri, SUMMARY_HEAD_BYTES);
+			}
 
 			let title: string | undefined;
 			let provider: BridgeConversationProvider = 'local';
@@ -1248,7 +1271,7 @@ export class ConversationBridge extends Disposable {
 		}
 
 		try {
-			const raw = await this.fileSystemService.readFile(fileUri);
+			const raw = await this.fileSystemService.readFile(fileUri, /* disableLimit */ true);
 			const text = this.textDecoder.decode(raw);
 
 			// Reconstruct the final session state by applying all patches in order.
