@@ -27,9 +27,10 @@
 
 		_bindScrollLock() {
 			// Detect when user manually scrolls up — suppress auto-scroll until they return to bottom.
+			// 200px threshold works better on mobile where momentum scrolling can briefly overshoot.
 			this.container.addEventListener('scroll', () => {
 				const distanceFromBottom = this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight;
-				this._userScrolledUp = distanceFromBottom > 80;
+				this._userScrolledUp = distanceFromBottom > 200;
 			}, { passive: true });
 		}
 
