@@ -156,6 +156,20 @@ class ChatSessionSourceRegistry extends Disposable {
 	private readonly controllersByType = new Map<string, vscode.ChatSessionItemController>();
 	private readonly originalRegisterProvider = vscode.chat.registerChatSessionItemProvider.bind(vscode.chat);
 	private readonly originalCreateController = vscode.chat.createChatSessionItemController.bind(vscode.chat);
+	private onTitleChangeFn: (() => void) | undefined;
+	private titleChangeTimer: ReturnType<typeof setTimeout> | undefined;
+
+	setOnTitleChange(fn: () => void): void {
+		this.onTitleChangeFn = fn;
+	}
+
+	private notifyTitleChange(): void {
+		// Debounce: VS Code may batch multiple item.set() calls when titling a session.
+		clearTimeout(this.titleChangeTimer);
+		this.titleChangeTimer = setTimeout(() => {
+			this.onTitleChangeFn?.();
+		}, 500);
+	}
 
 	constructor(
 		private readonly logService: ILogService,
@@ -185,6 +199,7 @@ class ChatSessionSourceRegistry extends Disposable {
 
 			chatApi.createChatSessionItemController = (chatSessionType, refreshHandler) => {
 				const controller = this.originalCreateController(chatSessionType, refreshHandler);
+				const onItemsChanged = () => this.notifyTitleChange();
 
 				const proxy = new Proxy(controller, {
 					get: (target, prop, receiver) => {
@@ -195,6 +210,24 @@ class ChatSessionSourceRegistry extends Disposable {
 								}
 								target.dispose();
 							};
+						}
+						// Intercept the items Map so we can detect when VS Code updates a
+						// session title (e.g. after AI title generation completes).
+						if (prop === 'items') {
+							const itemsMap = target.items;
+							return new Proxy(itemsMap, {
+								get(mapTarget, mapProp) {
+									const val = Reflect.get(mapTarget, mapProp, mapTarget);
+									if (mapProp === 'set' || mapProp === 'delete' || mapProp === 'clear') {
+										return function (this: unknown, ...args: unknown[]) {
+											const result = (val as (...a: unknown[]) => unknown).apply(mapTarget, args);
+											onItemsChanged();
+											return result;
+										};
+									}
+									return typeof val === 'function' ? (val as Function).bind(mapTarget) : val;
+								}
+							});
 						}
 						const value = Reflect.get(target, prop, receiver);
 						return typeof value === 'function' ? value.bind(target) : value;
@@ -393,6 +426,7 @@ export class SidecarContribution extends Disposable implements IExtensionContrib
 			fileSystemService,
 			this.extensionContext,
 			() => this.sessionSourceRegistry.listSummaries(),
+			(fn) => this.sessionSourceRegistry.setOnTitleChange(fn),
 		));
 		this.registerUi();
 		this.activationBlocker = Promise.resolve();

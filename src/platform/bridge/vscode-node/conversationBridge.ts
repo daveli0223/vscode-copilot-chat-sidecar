@@ -99,6 +99,7 @@ export class ConversationBridge extends Disposable {
 	private readonly globalStorageRootUri: URI | undefined;
 	private readonly copilotCliMetadataUri: URI | undefined;
 	private readonly readProviderSessionSummaries: (() => Promise<readonly BridgeConversationSummary[]>) | undefined;
+	private readonly registerProviderTitleChangeListener: ((fn: () => void) => void) | undefined;
 	private readonly modelOptionsById = new Map<string, BridgeModelOption>();
 	private readonly textDecoder = new TextDecoder();
 	private selectedModelId: string | undefined;
@@ -111,9 +112,11 @@ export class ConversationBridge extends Disposable {
 		private readonly fileSystemService: IFileSystemService,
 		extensionContext: IVSCodeExtensionContext,
 		readProviderSessionSummaries?: () => Promise<readonly BridgeConversationSummary[]>,
+		registerProviderTitleChangeListener?: (fn: () => void) => void,
 	) {
 		super();
 		this.readProviderSessionSummaries = readProviderSessionSummaries;
+		this.registerProviderTitleChangeListener = registerProviderTitleChangeListener;
 		const storageUri = extensionContext.storageUri;
 		if (storageUri) {
 			this.transcriptsDirUri = URI.joinPath(storageUri, 'transcripts');
@@ -162,6 +165,12 @@ export class ConversationBridge extends Disposable {
 		this._register(this.conversationStore.onDidConversationListChanged(() => {
 			void this.broadcastConversationList();
 		}));
+
+		// Re-broadcast when VS Code updates an AI-generated session title
+		// (titles are generated asynchronously after the first response completes).
+		this.registerProviderTitleChangeListener?.(() => {
+			void this.broadcastConversationList();
+		});
 		this._register(this.conversationStore.onDidUserTurn(event => {
 			this.bridgeServer.broadcast({
 				type: 'turn:user',
