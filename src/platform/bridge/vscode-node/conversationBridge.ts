@@ -1067,7 +1067,12 @@ export class ConversationBridge extends Disposable {
 	private async getConversationHistory(conversationId: string): Promise<readonly BridgeTurnHistoryItem[]> {
 		const conversation = this.conversationStore.getConversationBySessionId(conversationId);
 		if (conversation) {
-			return this.extractTurnsFromConversation(conversation);
+			const liveHistory = this.extractTurnsFromConversation(conversation);
+			if (liveHistory.length > 0) {
+				return liveHistory;
+			}
+			// In-memory conversation exists but has no extractable turns yet (e.g. store was
+			// rebuilt from persistence without full turn data). Fall through to file-based sources.
 		}
 
 		const transcriptHistory = await this.readTranscriptHistory(conversationId);
