@@ -32,7 +32,7 @@
 
 	const state = {
 		client: undefined,
-		currentConversationId: undefined,
+		currentConversationId: window.localStorage.getItem('sidecar.currentConversationId') || undefined,
 		conversations: [],
 		optimisticByConversation: new Map(),
 		pendingOptimisticContent: undefined,
@@ -395,6 +395,7 @@
 
 	function selectConversation(conversationId) {
 		state.currentConversationId = conversationId;
+		window.localStorage.setItem('sidecar.currentConversationId', conversationId);
 		state.isComposingNewConversation = false;
 		state.isStreaming = false;
 		updateComposerStopState();
@@ -443,6 +444,7 @@
 	function handleIncomingUserTurn(message) {
 		if (!state.currentConversationId) {
 			state.currentConversationId = message.conversationId;
+			window.localStorage.setItem('sidecar.currentConversationId', message.conversationId);
 			state.isComposingNewConversation = false;
 			if (state.pendingOptimisticContent) {
 				queueOptimisticMessage(message.conversationId, state.pendingOptimisticContent);
@@ -467,6 +469,7 @@
 	function handleIncomingAssistantStart(message) {
 		if (!state.currentConversationId && state.isComposingNewConversation) {
 			state.currentConversationId = message.conversationId;
+			window.localStorage.setItem('sidecar.currentConversationId', message.conversationId);
 			state.isComposingNewConversation = false;
 			renderConversationList();
 		}
@@ -751,6 +754,7 @@
 		if (newChatEl) {
 			newChatEl.addEventListener('click', () => {
 				state.currentConversationId = undefined;
+				window.localStorage.removeItem('sidecar.currentConversationId');
 				state.pendingOptimisticContent = undefined;
 				state.isComposingNewConversation = true;
 				state.isStreaming = false;
