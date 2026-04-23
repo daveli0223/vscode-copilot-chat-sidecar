@@ -722,8 +722,7 @@
 
 		if (openModelPickerEl) {
 			openModelPickerEl.addEventListener('click', () => {
-				// Open VS Code's chat panel and bring model picker into view.
-				state.client?.send({ type: 'ui:command', commandId: 'workbench.action.chat.open' });
+				state.client?.send({ type: 'ui:command', commandId: 'github.copilot.chat.openModelPicker' });
 			});
 		}
 	}
