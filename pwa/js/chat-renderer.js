@@ -580,7 +580,7 @@
 					buttonEl.textContent = buttonText;
 					buttonEl.addEventListener('click', () => {
 						if (typeof this.confirmationRunner === 'function') {
-							this.confirmationRunner(buttonText);
+							this.confirmationRunner(buttonText, turnId);
 						}
 						// Disable all buttons in this confirmation after one is clicked.
 						for (const sibling of buttonRow.querySelectorAll('button')) {

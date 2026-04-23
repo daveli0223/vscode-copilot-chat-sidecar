@@ -356,7 +356,14 @@ type UiCommandMessage = {
 	args?: readonly unknown[];
 };
 
-type ClientMessage = PromptSubmitMessage | ConversationSelectMessage | ConversationListRequestMessage | UiModelSetMessage | UiModeSetMessage | UiCommandMessage;
+type ConfirmationRespondMessage = {
+	type: 'confirmation:respond';
+	conversationId: string;
+	turnId: string;
+	buttonLabel: string;
+};
+
+type ClientMessage = PromptSubmitMessage | ConversationSelectMessage | ConversationListRequestMessage | UiModelSetMessage | UiModeSetMessage | UiCommandMessage | ConfirmationRespondMessage;
 
 const SESSION_TOKEN_BYTES = 16;
 
@@ -421,6 +428,11 @@ function isClientMessage(value: unknown): value is ClientMessage {
 			return typeof value.commandId === 'string'
 				&& (value.args === undefined || Array.isArray(value.args));
 		}
+		case 'confirmation:respond': {
+			return typeof value.conversationId === 'string'
+				&& typeof value.turnId === 'string'
+				&& typeof value.buttonLabel === 'string';
+		}
 		default: {
 			return false;
 		}
@@ -458,6 +470,7 @@ export class BridgeServer extends Disposable {
 	onUiModelSelected: ((modelId: string) => void) | undefined;
 	onUiModeSelected: ((modeId: string) => void) | undefined;
 	onUiCommandRequested: ((commandId: BridgeUiCommandId, args?: readonly unknown[]) => void) | undefined;
+	onConfirmationResponded: ((conversationId: string, turnId: string, buttonLabel: string) => void) | undefined;
 
 	get sessionToken(): string {
 		return this._sessionToken;
@@ -555,6 +568,10 @@ export class BridgeServer extends Disposable {
 					}
 					case 'ui:command': {
 						this.onUiCommandRequested?.(parsedMessage.commandId, parsedMessage.args);
+						break;
+					}
+					case 'confirmation:respond': {
+						this.onConfirmationResponded?.(parsedMessage.conversationId, parsedMessage.turnId, parsedMessage.buttonLabel);
 						break;
 					}
 				}

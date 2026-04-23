@@ -161,6 +161,16 @@ export class ConversationBridge extends Disposable {
 		this.bridgeServer.onUiCommandRequested = (commandId, args) => {
 			void this.executeUiCommand(commandId, args);
 		};
+		this.bridgeServer.onConfirmationResponded = (conversationId, turnId, buttonLabel) => {
+			// VS Code's chat confirmation mechanism is internal to VS Code's chat widget and
+			// cannot be accepted/rejected via an external command. Open and focus the chat
+			// panel so the desktop user can click the right button based on the phone's choice.
+			void vscode.commands.executeCommand('workbench.action.chat.open');
+			void vscode.window.showInformationMessage(
+				`Phone selected "${buttonLabel}" — confirm in VS Code chat`,
+				{ modal: false }
+			);
+		};
 
 		this._register(this.conversationStore.onDidConversationListChanged(() => {
 			void this.broadcastConversationList();
@@ -196,6 +206,10 @@ export class ConversationBridge extends Disposable {
 			});
 		}));
 		this._register(this.conversationStore.onDidAssistantTurnReference(event => {
+			// Skip auto-attached instruction files — they clutter the phone display
+			if (event.uri && (event.uri.endsWith('.instructions.md') || event.uri.includes('.github/instructions/'))) {
+				return;
+			}
 			this.bridgeServer.broadcast({
 				type: 'turn:reference',
 				conversationId: event.conversationId,
@@ -1144,10 +1158,13 @@ export class ConversationBridge extends Disposable {
 			return undefined;
 		}
 
+		const filteredReferences = artifacts.references.filter(
+			r => !(r.uri && (r.uri.endsWith('.instructions.md') || r.uri.includes('.github/instructions/')))
+		);
 		const bridgeArtifacts: BridgeAssistantTurnArtifacts = {
 			statuses: artifacts.statuses.length > 0 ? [...artifacts.statuses] : undefined,
 			tools: artifacts.tools.length > 0 ? [...artifacts.tools] : undefined,
-			references: artifacts.references.length > 0 ? [...artifacts.references] : undefined,
+			references: filteredReferences.length > 0 ? [...filteredReferences] : undefined,
 			codeCitations: artifacts.codeCitations.length > 0 ? [...artifacts.codeCitations] : undefined,
 			confirmations: artifacts.confirmations.length > 0 ? [...artifacts.confirmations] : undefined,
 			questionCarousels: artifacts.questionCarousels.length > 0 ? [...artifacts.questionCarousels] : undefined,

@@ -65,15 +65,16 @@
 		});
 	});
 
-	renderer.setConfirmationRunner(buttonText => {
+	renderer.setConfirmationRunner((buttonText, turnId) => {
 		if (!state.client || !buttonText) {
 			return;
 		}
 
 		state.client.send({
-			type: 'prompt:submit',
-			content: buttonText,
-			conversationId: state.currentConversationId,
+			type: 'confirmation:respond',
+			conversationId: state.currentConversationId ?? '',
+			turnId: turnId ?? '',
+			buttonLabel: buttonText,
 		});
 	});
 
