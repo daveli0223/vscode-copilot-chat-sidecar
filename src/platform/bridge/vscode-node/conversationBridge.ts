@@ -309,17 +309,24 @@ export class ConversationBridge extends Disposable {
 	}
 
 	private async sendSnapshot(respond: (message: BridgeMessage) => void, filter?: BridgeConversationFilter): Promise<void> {
+		const conversations = await this.getConversationSummaries(filter);
+		this.logService.info(`[ConversationBridge] sendSnapshot: ${conversations.length} conversations`);
+		for (const c of conversations.slice(0, 5)) {
+			this.logService.info(`[ConversationBridge]   - ${c.id}: "${c.title}" (${c.provider}, ${c.status})`);
+		}
 		respond({
 			type: 'conversation:list',
-			conversations: await this.getConversationSummaries(filter),
+			conversations,
 		});
 		respond(await this.getUiStateMessage());
 	}
 
 	private async broadcastConversationList(): Promise<void> {
+		const conversations = await this.getConversationSummaries();
+		this.logService.info(`[ConversationBridge] broadcastConversationList: ${conversations.length} conversations`);
 		this.bridgeServer.broadcast({
 			type: 'conversation:list',
-			conversations: await this.getConversationSummaries(),
+			conversations,
 		});
 	}
 
