@@ -344,6 +344,19 @@ export class ConversationBridge extends Disposable {
 			conversations,
 		});
 		respond(await this.getUiStateMessage());
+
+		// When the first snapshot is empty (providers may not be registered yet
+		// at startup, or file reads are still in flight), retry once after a
+		// short delay so the client doesn't stay stuck on "No conversations".
+		if (conversations.length === 0) {
+			setTimeout(async () => {
+				const retry = await this.getConversationSummaries(filter);
+				if (retry.length > 0) {
+					this.logService.trace(`[ConversationBridge] sendSnapshot retry: ${retry.length} conversations`);
+					respond({ type: 'conversation:list', conversations: retry });
+				}
+			}, 2000);
+		}
 	}
 
 	private async broadcastConversationList(): Promise<void> {
