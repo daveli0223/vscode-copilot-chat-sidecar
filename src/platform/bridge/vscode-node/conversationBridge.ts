@@ -92,15 +92,6 @@ type JsonConversationScanOptions = {
 	readonly fallbackLastUpdated: number;
 };
 
-/** Returns true for instruction/rules files that should be hidden from the phone display. */
-function isInstructionFileUri(uri: string): boolean {
-	const lower = uri.toLowerCase();
-	return lower.endsWith('.instructions.md')
-		|| lower.endsWith('copilot-instructions.md')
-		|| lower.includes('.github/instructions/')
-		|| lower.includes('.claude/rules/');
-}
-
 export class ConversationBridge extends Disposable {
 	private isActive = false;
 	private readonly transcriptsDirUri: URI | undefined;
@@ -215,8 +206,8 @@ export class ConversationBridge extends Disposable {
 			});
 		}));
 		this._register(this.conversationStore.onDidAssistantTurnReference(event => {
-			// Skip auto-attached instruction/rules files — they clutter the phone display
-			if (event.uri && isInstructionFileUri(event.uri)) {
+			// Skip auto-attached instruction files — they clutter the phone display
+			if (event.uri && (event.uri.endsWith('.instructions.md') || event.uri.includes('.github/instructions/'))) {
 				return;
 			}
 			this.bridgeServer.broadcast({
@@ -303,6 +294,17 @@ export class ConversationBridge extends Disposable {
 				turnId: event.turnId,
 			});
 			void this.broadcastConversationList();
+		}));
+
+		// When a new client connects the initial snapshot may be empty if cloud session
+		// providers haven't responded yet.  Re-broadcast the conversation list after a
+		// short delay so the phone picks up sessions that were already open in VS Code.
+		let prevClientCount = 0;
+		this._register(this.bridgeServer.onDidClientCountChange(count => {
+			if (count > prevClientCount) {
+				setTimeout(() => void this.broadcastConversationList(), 2000);
+			}
+			prevClientCount = count;
 		}));
 	}
 
@@ -1168,7 +1170,7 @@ export class ConversationBridge extends Disposable {
 		}
 
 		const filteredReferences = artifacts.references.filter(
-			r => !(r.uri && isInstructionFileUri(r.uri))
+			r => !(r.uri && (r.uri.endsWith('.instructions.md') || r.uri.includes('.github/instructions/')))
 		);
 		const bridgeArtifacts: BridgeAssistantTurnArtifacts = {
 			statuses: artifacts.statuses.length > 0 ? [...artifacts.statuses] : undefined,
@@ -2149,6 +2151,14 @@ export class ConversationBridge extends Disposable {
 
 	private async executeUiCommand(commandId: BridgeUiCommandId, args?: readonly unknown[]): Promise<void> {
 		try {
+			// Some commands require the chat panel to be active/focused before they work.
+			// Focus it first so pickers and context-sensitive actions open correctly.
+			const needsFocus = commandId === 'workbench.action.chat.attachFile'
+				|| commandId === 'workbench.action.chat.attachSelection'
+				|| commandId === 'github.copilot.chat.openModelPicker';
+			if (needsFocus) {
+				await vscode.commands.executeCommand('workbench.action.chat.open');
+			}
 			if (args && args.length > 0) {
 				await vscode.commands.executeCommand(commandId, ...args);
 			} else {

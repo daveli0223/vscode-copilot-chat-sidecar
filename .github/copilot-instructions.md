@@ -351,3 +351,28 @@ This extension is a complex, multi-layered system that provides comprehensive AI
   - Look for existing `I*Service` interfaces before reaching for raw APIs
   - **Why**: Enables unit testing without VS Code host, supports simulation tests, provides cross-platform abstractions (Node vs web), and adds features like caching and size limits
 - Always use the URI type instead of using string file paths. There are many helpers available for working with URIs.
+
+## Sidecar Fork Context
+
+This is a **fork of `microsoft/vscode-copilot-chat`** maintained at `daveli0223/vscode-copilot-chat-sidecar`.
+
+The fork adds a **mobile PWA bridge** that lets a phone act as a remote chat UI for VS Code:
+- Bridge server: `src/platform/bridge/` — HTTP + WebSocket server, one per VS Code window
+- PWA client: `pwa/` — vanilla JS progressive web app served to the phone
+- Tunnel: cloudflare (default), ngrok, or devtunnel via `github.copilot.sidecar.tunnelProvider`
+- Sidecar contribution: `src/extension/conversation/vscode-node/sidecarContribution.ts`
+- Conversation bridge: `src/platform/bridge/vscode-node/conversationBridge.ts`
+
+**Build & install:** `./script/reinstall-sidecar.sh` — compiles TypeScript, packages VSIX, installs.
+**Push:** `git push --no-verify origin feat/proxy` (git-lfs hook present but not needed).
+
+## Session Wrap — Changelog Workflow
+
+After any non-trivial session (fix, feature, refactor, research):
+
+1. Commit all modified source files with a conventional commit message (`feat:`, `fix:`, `chore:`, `refactor:`)
+2. Append an entry to `CHANGELOG.md` (Keep a Changelog format) describing what changed
+3. Create a doc in `docs/` only if a procedure/finding is reusable across sessions
+
+**Trigger phrases (run without being asked):** "wrap up", "commit findings", "save and commit",
+"update changelog", "log our changes", "commit the fix", "record this change".
