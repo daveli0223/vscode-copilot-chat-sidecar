@@ -18,7 +18,24 @@
 			this.historyCounter = 0;
 			this.commandRunner = undefined;
 			this.confirmationRunner = undefined;
+			// Auto-scroll is paused when the user has scrolled up or the input has focus.
+			this._userScrolledUp = false;
+			this._inputFocused = false;
+			this._bindScrollLock();
 			this.configureMarkdown();
+		}
+
+		_bindScrollLock() {
+			// Detect when user manually scrolls up — suppress auto-scroll until they return to bottom.
+			this.container.addEventListener('scroll', () => {
+				const distanceFromBottom = this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight;
+				this._userScrolledUp = distanceFromBottom > 80;
+			}, { passive: true });
+		}
+
+		/** Call this when the prompt input gains/loses focus so streaming doesn't yank scroll position. */
+		setInputFocused(focused) {
+			this._inputFocused = !!focused;
 		}
 
 		setCommandRunner(commandRunner) {
@@ -976,6 +993,19 @@
 		}
 
 		scrollToBottom() {
+			// Don't hijack scroll when the user has scrolled up to read, or when
+			// they're actively typing in the prompt input.
+			if (this._userScrolledUp || this._inputFocused) {
+				return;
+			}
+			window.requestAnimationFrame(() => {
+				this.container.scrollTop = this.container.scrollHeight;
+			});
+		}
+
+		/** Force-scroll regardless of lock state (e.g. after the user submits a prompt). */
+		scrollToBottomForced() {
+			this._userScrolledUp = false;
 			window.requestAnimationFrame(() => {
 				this.container.scrollTop = this.container.scrollHeight;
 			});

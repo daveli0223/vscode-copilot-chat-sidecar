@@ -638,6 +638,8 @@
 		state.client.send({ type: 'prompt:submit', content, conversationId });
 		promptInputEl.value = '';
 		promptInputEl.style.height = 'auto';
+		// After sending, scroll to the bottom so the user sees their message and the incoming reply.
+		renderer.scrollToBottomForced();
 	}
 
 	function isMobileEnterNewlinePreferred() {
@@ -650,6 +652,10 @@
 	}
 
 	function initializeComposer() {
+		// Pause auto-scroll while the user is typing so streaming output doesn't yank the viewport.
+		promptInputEl.addEventListener('focus', () => renderer.setInputFocused(true));
+		promptInputEl.addEventListener('blur', () => renderer.setInputFocused(false));
+
 		promptInputEl.addEventListener('input', () => {
 			promptInputEl.style.height = 'auto';
 			promptInputEl.style.height = `${Math.min(promptInputEl.scrollHeight, 200)}px`;
