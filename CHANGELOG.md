@@ -9,6 +9,15 @@ For more frequent updates, check the [Commit log](https://github.com/Microsoft/v
 ## [Unreleased] — Sidecar fork
 
 ### Fixed
+- **Conversation view disappears on switch+submit** — two root causes fixed:
+  1. Stale `conversation:history` response arriving after the user already typed+submitted wiped
+     the optimistic message; history is now skipped when there are pending optimistic turns or
+     an active stream
+  2. When VS Code silently creates a fresh session (cloud/historical sessions with unknown IDs),
+     the new session is automatically adopted by matching the pending content, so the AI response
+     renders instead of being silently dropped
+- **New-conversation submit path** — bridge skips the one-shot `chat.open` for new chats
+  (no sessionId) and always uses the reliable two-step open → submit sequence
 - **PWA toolbar buttons** — attach buttons now use the correct extension-registered command IDs
   (`github.copilot.chat.attachFile/Selection`); bridge waits 350ms after focusing chat panel
   so the widget is interactive before the command fires
