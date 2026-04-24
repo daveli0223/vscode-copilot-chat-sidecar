@@ -323,6 +323,17 @@ export class ChatParticipantRequestHandler {
 			}));
 		}
 
+		// Extract command line from ChatTerminalToolInvocationData via duck-typing.
+		let commandLine: string | undefined;
+		if (toolSpecificData && typeof toolSpecificData === 'object') {
+			const cmdData = toolSpecificData as { commandLine?: { original?: string } };
+			if (typeof cmdData.commandLine?.original === 'string') {
+				commandLine = cmdData.commandLine.original.trim() || undefined;
+			}
+		}
+
+		const isConfirmationPending = !part.isComplete && !part.isError;
+
 		return {
 			conversationId: this.conversation.sessionId,
 			turnId: this.turn.id,
@@ -332,6 +343,8 @@ export class ChatParticipantRequestHandler {
 			isError: Boolean(part.isError),
 			isComplete: Boolean(part.isComplete),
 			todoList,
+			commandLine,
+			isConfirmationPending: commandLine ? isConfirmationPending : undefined,
 		};
 	}
 

@@ -232,9 +232,35 @@ html, body {
 .conversation-time {
 	font-size: 11px;
 	color: var(--vscode-descriptionForeground);
+        display: flex;
+        align-items: center;
+        gap: 5px;
 }
 
-/* ---- Chat Container ---- */
+.conv-status-badge {
+        font-size: 0.6rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        padding: 1px 5px;
+        border-radius: 3px;
+        text-transform: lowercase;
+        flex-shrink: 0;
+}
+
+.conv-status-badge.done {
+        color: var(--vscode-descriptionForeground);
+        opacity: 0.55;
+}
+
+.conv-status-badge.working {
+        background: var(--vscode-statusBarItem-warningBackground, #6e4c00);
+        color: var(--vscode-statusBarItem-warningForeground, #fff);
+        animation: conv-status-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes conv-status-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
 .chat-container {
 	flex: 1;
 	display: flex;
@@ -555,6 +581,7 @@ details[open] > .assistant-thinking-summary::before {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
+	align-items: center;
 }
 
 .assistant-confirmation-button {
@@ -563,6 +590,28 @@ details[open] > .assistant-thinking-summary::before {
 	border: 1px solid var(--vscode-sideBar-border);
 	background: color-mix(in srgb, var(--vscode-button-background) 22%, transparent);
 	font-size: 11px;
+}
+
+.assistant-confirmation-code {
+	font-family: var(--code-font-family);
+	font-size: 11px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-break: break-all;
+	background: color-mix(in srgb, var(--vscode-textCodeBlock-background) 80%, transparent);
+	border: 1px solid color-mix(in srgb, var(--vscode-sideBar-border) 60%, transparent);
+	border-radius: 4px;
+	padding: 6px 8px;
+	margin: 4px 0;
+	overflow-x: auto;
+}
+
+.assistant-confirmation-note {
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.75;
+	font-style: italic;
+	margin-left: auto;
 }
 
 .assistant-questions-list {

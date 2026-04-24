@@ -276,7 +276,21 @@ export class ConversationBridge extends Disposable {
 				isError: event.isError,
 				isComplete: event.isComplete,
 				todoList: event.todoList,
+				commandLine: event.commandLine,
+				isConfirmationPending: event.isConfirmationPending,
 			});
+			// When a terminal tool is waiting for the user to confirm, emit a synthetic
+			// confirmation card so the PWA shows the command and an advisory note.
+			if (event.isConfirmationPending && event.commandLine) {
+				this.bridgeServer.broadcast({
+					type: 'turn:confirmation',
+					conversationId: event.conversationId,
+					turnId: event.turnId,
+					title: `Run ${event.toolName ?? 'command'}?`,
+					message: event.commandLine,
+					buttons: ['Allow', 'Skip'],
+				});
+			}
 		}));
 		this._register(this.conversationStore.onDidAssistantTurnConfirmation(event => {
 			this.bridgeServer.broadcast({

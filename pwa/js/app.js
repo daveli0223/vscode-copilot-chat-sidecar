@@ -287,9 +287,13 @@
 
 			const time = document.createElement('div');
 			time.className = 'conversation-time';
-			time.textContent = formatRelativeTime(conversation.lastUpdated);
-			item.appendChild(time);
-
+                        const timeText = document.createElement('span');
+                        timeText.textContent = formatRelativeTime(conversation.lastUpdated);
+                        time.appendChild(timeText);
+                        const statusBadge = document.createElement('span');
+                        statusBadge.className = `conv-status-badge${isStreaming ? ' working' : ' done'}`;
+                        statusBadge.textContent = isStreaming ? 'working' : 'done';
+                        time.appendChild(statusBadge);
 			item.addEventListener('click', () => {
 				selectConversation(conversation.id);
 			});
@@ -313,10 +317,11 @@
 		const activeItem = conversationListEl.querySelector('.conversation-item.active');
 		if (activeItem) {
 			activeItem.classList.toggle('streaming', isStreaming);
-		}
-	}
-
-	function renderSelector(selectEl, options, selectedId, fallbackLabel) {
+                        const badge = activeItem.querySelector('.conv-status-badge');
+                        if (badge) {
+                                badge.className = `conv-status-badge${isStreaming ? ' working' : ' done'}`;
+                                badge.textContent = isStreaming ? 'working' : 'done';
+                        }
 		if (!selectEl) {
 			return;
 		}

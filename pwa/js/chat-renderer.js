@@ -592,10 +592,20 @@
 			}
 
 			if (message) {
-				const messageEl = document.createElement('div');
-				messageEl.className = 'assistant-confirmation-message';
-				messageEl.textContent = message;
-				item.appendChild(messageEl);
+				// Render as a code block when the message looks like a shell command
+				// (no HTML, multi-word, or contains typical shell characters).
+				const isCommandLike = /[&|$`;\n\\]/.test(message) || message.startsWith('npm ') || message.startsWith('./') || message.includes(' && ');
+				if (isCommandLike) {
+					const codeEl = document.createElement('pre');
+					codeEl.className = 'assistant-confirmation-code';
+					codeEl.textContent = message;
+					item.appendChild(codeEl);
+				} else {
+					const messageEl = document.createElement('div');
+					messageEl.className = 'assistant-confirmation-message';
+					messageEl.textContent = message;
+					item.appendChild(messageEl);
+				}
 			}
 
 			if (buttons.length > 0) {
@@ -617,6 +627,11 @@
 					});
 					buttonRow.appendChild(buttonEl);
 				}
+				// Advisory note: VS Code desktop still controls the actual execution.
+				const note = document.createElement('div');
+				note.className = 'assistant-confirmation-note';
+				note.textContent = 'Confirm on VS Code desktop';
+				buttonRow.appendChild(note);
 				item.appendChild(buttonRow);
 			}
 
