@@ -2286,20 +2286,27 @@ export class ConversationBridge extends Disposable {
 			return;
 		}
 
-		try {
-			await vscode.commands.executeCommand('workbench.action.chat.open', {
-				query: trimmedPrompt,
-				isPartialQuery: false,
-				sessionId: conversationId,
-			});
-			return;
-		} catch (error) {
-			this.logService.warn(`[ConversationBridge] Failed to submit prompt with direct chat.open submission: ${error instanceof Error ? error.message : String(error)}`);
+		// For an existing conversation use the one-shot open+submit command.
+		// For a new conversation (no sessionId) skip the one-shot path: VS Code may
+		// return successfully without actually submitting when no session is specified,
+		// so we always fall through to the explicit open → submit two-step.
+		if (conversationId) {
+			try {
+				await vscode.commands.executeCommand('workbench.action.chat.open', {
+					query: trimmedPrompt,
+					isPartialQuery: false,
+					sessionId: conversationId,
+				});
+				return;
+			} catch (error) {
+				this.logService.warn(`[ConversationBridge] Failed to submit prompt with direct chat.open submission: ${error instanceof Error ? error.message : String(error)}`);
+			}
 		}
 
+		// Two-step fallback: open the panel (fills the query input), then submit.
 		await vscode.commands.executeCommand('workbench.action.chat.open', {
 			query: trimmedPrompt,
-			sessionId: conversationId,
+			...(conversationId ? { sessionId: conversationId } : {}),
 		});
 
 		try {

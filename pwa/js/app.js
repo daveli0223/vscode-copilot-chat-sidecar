@@ -424,7 +424,7 @@
 
 		renderConversationList();
 
-		if (!state.currentConversationId && state.conversations.length === 0) {
+		if (!state.currentConversationId && state.conversations.length === 0 && !state.pendingOptimisticContent) {
 			renderer.showEmptyState(hasActiveConversationFilters()
 				? 'No conversations match your filters. Clear filters to view all sessions.'
 				: 'No conversations yet. Start a new chat below.');
@@ -438,6 +438,12 @@
 
 	function handleConversationHistory(message) {
 		if (!message || message.conversationId !== state.currentConversationId) {
+			return;
+		}
+		// Skip stale history if the user has already submitted a message while the
+		// history fetch was in-flight. Calling renderHistory() here would wipe the
+		// optimistic user-turn (and any streaming response) from the view.
+		if ((state.optimisticByConversation.get(message.conversationId)?.length ?? 0) > 0 || state.isStreaming) {
 			return;
 		}
 		renderer.renderHistory(message.turns);
@@ -460,7 +466,23 @@
 		});
 
 		if (message.conversationId !== state.currentConversationId) {
-			return;
+			// VS Code may create a fresh session when it can't locate the target
+			// session by ID (e.g. cloud / historical sessions). If the incoming
+			// user-turn content matches our pending optimistic message for the
+			// current conversation, adopt the new session ID so that the AI
+			// response is shown rather than silently dropped.
+			const pendingQueue = state.optimisticByConversation.get(state.currentConversationId);
+			if (pendingQueue?.length > 0 && pendingQueue[0] === message.content) {
+				const adoptedId = message.conversationId;
+				state.optimisticByConversation.delete(state.currentConversationId);
+				state.optimisticByConversation.set(adoptedId, pendingQueue);
+				state.currentConversationId = adoptedId;
+				window.localStorage.setItem('sidecar.currentConversationId', adoptedId);
+				renderConversationList();
+				// Fall through: consume the optimistic message below.
+			} else {
+				return;
+			}
 		}
 		if (consumeOptimisticMessage(message.conversationId, message.content)) {
 			return;
