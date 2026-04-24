@@ -9,6 +9,7 @@ For more frequent updates, check the [Commit log](https://github.com/Microsoft/v
 ## [Unreleased] — Sidecar fork
 
 ### Fixed
+- **History truncation for large sessions** — `readWorkspaceChatSessionHistory` now caps returned turns to the latest 100; the full JSONL file is still replayed to reconstruct correct state, but only the most recent context is sent to the PWA, preventing WebSocket overflow on 8–12 MB session files
 - **Conversation view disappears on switch+submit** — two root causes fixed:
   1. Stale `conversation:history` response arriving after the user already typed+submitted wiped
      the optimistic message; history is now skipped when there are pending optimistic turns or
