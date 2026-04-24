@@ -280,7 +280,7 @@
 			entry.markdown += chunk;
 			entry.markdownHost.innerHTML = this.renderMarkdown(entry.markdown);
 			this.decorateCodeBlocks(entry.markdownHost);
-			this.scrollToBottom();
+			// Auto-scroll disabled during streaming; the user can scroll manually.
 		}
 
 		appendAssistantReference(turnId, reference) {

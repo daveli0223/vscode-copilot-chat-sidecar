@@ -304,6 +304,18 @@
 		}
 	}
 
+	/**
+	 * Toggle the `streaming` CSS class on the active conversation item without
+	 * rebuilding the entire sidebar list. This avoids resetting scroll position
+	 * and disrupting keyboard focus while the agent is answering.
+	 */
+	function updateActiveConversationStreamingClass(isStreaming) {
+		const activeItem = conversationListEl.querySelector('.conversation-item.active');
+		if (activeItem) {
+			activeItem.classList.toggle('streaming', isStreaming);
+		}
+	}
+
 	function renderSelector(selectEl, options, selectedId, fallbackLabel) {
 		if (!selectEl) {
 			return;
@@ -501,7 +513,9 @@
 			renderer.startAssistantTurn(message.turnId);
 			state.isStreaming = true;
 			updateComposerStopState();
-			renderConversationList();
+			// Only update the streaming CSS class — avoid rebuilding the sidebar DOM
+			// which would reset scroll position and disrupt keyboard focus.
+			updateActiveConversationStreamingClass(true);
 		}
 	}
 
@@ -592,7 +606,8 @@
 			renderer.completeAssistantTurn(message.turnId);
 			state.isStreaming = false;
 			updateComposerStopState();
-			renderConversationList();
+			// Remove the streaming class without rebuilding the whole list.
+			updateActiveConversationStreamingClass(false);
 		}
 	}
 
