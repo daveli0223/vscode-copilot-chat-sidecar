@@ -1421,10 +1421,17 @@ export class ConversationBridge extends Disposable {
 			history.sort((a, b) => a.timestamp - b.timestamp);
 
 			// Cap to the latest N turns so large sessions don't flood the WebSocket.
+			// Always align to a user turn first so we never return an orphaned assistant
+			// reply whose user message was cut off by the slice boundary.
 			const MAX_HISTORY_TURNS = 100;
-			return history.length > MAX_HISTORY_TURNS
+			let truncated: BridgeTurnHistoryItem[] = history.length > MAX_HISTORY_TURNS
 				? history.slice(history.length - MAX_HISTORY_TURNS)
 				: history;
+			const firstUserIdx = truncated.findIndex(t => t.role === 'user');
+			if (firstUserIdx > 0) {
+				truncated = truncated.slice(firstUserIdx);
+			}
+			return truncated;
 		} catch {
 			return [];
 		}
