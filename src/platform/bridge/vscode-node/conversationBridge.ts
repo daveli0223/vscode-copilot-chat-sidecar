@@ -1405,7 +1405,12 @@ export class ConversationBridge extends Disposable {
 
 			this.appendTurnsFromRequestArray(sortedRequests, history, seenKeys);
 			history.sort((a, b) => a.timestamp - b.timestamp);
-			return history;
+
+			// Cap to the latest N turns so large sessions don't flood the WebSocket.
+			const MAX_HISTORY_TURNS = 100;
+			return history.length > MAX_HISTORY_TURNS
+				? history.slice(history.length - MAX_HISTORY_TURNS)
+				: history;
 		} catch {
 			return [];
 		}
