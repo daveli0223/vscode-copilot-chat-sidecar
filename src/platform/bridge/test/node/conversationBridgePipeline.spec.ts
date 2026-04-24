@@ -1219,4 +1219,73 @@ describe('ConversationBridge pipeline', () => {
 			{ id: 'session-1', title: 'Ship release', lastUpdated: 3, provider: 'claude', status: 'completed' },
 		]);
 	});
+
+	test('broadcasts commandLine on turn:tool when tool has terminal data', async () => {
+		harness = await createHarness([]);
+		await harness.client.waitForType('conversation:list');
+
+		harness.store.reportAssistantTurnToolInvocation({
+			conversationId: 'session-1',
+			turnId: 'turn-1',
+			toolName: 'run_in_terminal',
+			toolCallId: 'tool-term-1',
+			message: 'Running npm ci',
+			isError: false,
+			isComplete: false,
+			commandLine: 'npm ci',
+		});
+
+		const toolMsg = await harness.client.waitForType('turn:tool');
+		expect(toolMsg.toolName).toBe('run_in_terminal');
+		expect((toolMsg as unknown as { commandLine?: string }).commandLine).toBe('npm ci');
+	});
+
+	test('emits synthetic turn:confirmation for pending terminal tool invocations', async () => {
+		harness = await createHarness([]);
+		await harness.client.waitForType('conversation:list');
+
+		harness.store.reportAssistantTurnToolInvocation({
+			conversationId: 'session-1',
+			turnId: 'turn-1',
+			toolName: 'run_in_terminal',
+			toolCallId: 'tool-term-2',
+			message: 'Running tests',
+			isError: false,
+			isComplete: false,
+			commandLine: 'npm run test:unit',
+			isConfirmationPending: true,
+		});
+
+		// Both turn:tool and the synthetic turn:confirmation should arrive.
+		const toolMsg = await harness.client.waitForType('turn:tool');
+		expect(toolMsg.toolName).toBe('run_in_terminal');
+
+		const confirmMsg = await harness.client.waitForType('turn:confirmation');
+		expect(confirmMsg.message).toBe('npm run test:unit');
+		expect(confirmMsg.buttons).toEqual(['Allow', 'Skip']);
+		expect(confirmMsg.title).toContain('run_in_terminal');
+	});
+
+	test('does not emit synthetic turn:confirmation for completed terminal tool invocations', async () => {
+		harness = await createHarness([]);
+		await harness.client.waitForType('conversation:list');
+
+		harness.store.reportAssistantTurnToolInvocation({
+			conversationId: 'session-1',
+			turnId: 'turn-1',
+			toolName: 'run_in_terminal',
+			toolCallId: 'tool-term-3',
+			message: 'Done',
+			isError: false,
+			isComplete: true,  // already completed — no confirmation card needed
+			commandLine: 'npm run compile',
+			isConfirmationPending: false,
+		});
+
+		await harness.client.waitForType('turn:tool');
+
+		// Give any spurious messages time to arrive then verify none appeared.
+		await new Promise(resolve => setTimeout(resolve, 100));
+		expect(harness!.client.countType('turn:confirmation')).toBe(0);
+	});
 });
