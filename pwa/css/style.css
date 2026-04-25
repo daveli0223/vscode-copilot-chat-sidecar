@@ -248,8 +248,7 @@ html, body {
 }
 
 .conv-status-badge.done {
-        color: var(--vscode-descriptionForeground);
-        opacity: 0.55;
+        display: none;
 }
 
 .conv-status-badge.working {
@@ -261,6 +260,8 @@ html, body {
 @keyframes conv-status-pulse {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.4; }
+}
+
 .chat-container {
 	flex: 1;
 	display: flex;

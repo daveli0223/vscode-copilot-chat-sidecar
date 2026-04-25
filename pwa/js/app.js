@@ -318,11 +318,15 @@
 		const activeItem = conversationListEl.querySelector('.conversation-item.active');
 		if (activeItem) {
 			activeItem.classList.toggle('streaming', isStreaming);
-                        const badge = activeItem.querySelector('.conv-status-badge');
-                        if (badge) {
-                                badge.className = `conv-status-badge${isStreaming ? ' working' : ' done'}`;
-                                badge.textContent = isStreaming ? 'working' : 'done';
-                        }
+			const badge = activeItem.querySelector('.conv-status-badge');
+			if (badge) {
+				badge.className = `conv-status-badge${isStreaming ? ' working' : ' done'}`;
+				badge.textContent = isStreaming ? 'working' : 'done';
+			}
+		}
+	}
+
+	function renderSelector(selectEl, options, selectedId, fallbackLabel) {
 		if (!selectEl) {
 			return;
 		}
@@ -592,6 +596,16 @@
 				commandId: message.commandId,
 				title: message.title,
 				args: message.args,
+			});
+		}
+	}
+
+	function handleIncomingAssistantConfirmation(message) {
+		if (message.conversationId === state.currentConversationId) {
+			renderer.appendAssistantConfirmation(message.turnId, {
+				title: message.title,
+				message: message.message,
+				buttons: message.buttons,
 			});
 		}
 	}

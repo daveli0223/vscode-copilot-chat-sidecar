@@ -1,4 +1,4 @@
-const CACHE_NAME = 'copilot-sidecar-v2';
+const CACHE_NAME = 'copilot-sidecar-v3';
 const STATIC_ASSETS = [
 	'./',
 	'./index.html',
