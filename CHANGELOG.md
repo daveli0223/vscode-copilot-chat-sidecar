@@ -8,7 +8,14 @@ For more frequent updates, check the [Commit log](https://github.com/Microsoft/v
 
 ## [Unreleased] — Sidecar fork
 
+### Added
+- **Status badges in conversation sidebar** — each conversation item shows a pulsing "working" badge during active streams and a muted "done" badge otherwise; badge updates in-place without a full list re-render ([70fe28c4a])
+
 ### Fixed
+- **New-conversation isolation** — pressing "+" now always creates a genuinely new VS Code chat session instead of appending to the existing one; uses `chat.open` + `newChat({inputValue})` which atomically clears the session and submits (matching VS Code's own pattern discovered in the bundle) ([70fe28c4a])
+- **History disappears on conversation switch** — stale optimistic queue is now cleared when switching away; `handleConversationHistory` only blocks on `isStreaming`, not any pending optimistic entry ([70fe28c4a])
+- **Terminal output not shown** — full pipeline now connected: extraction from `run_in_terminal` tool data in `chatParticipantRequestHandler` → `IConversationTurnToolInvocationEvent` → bridge broadcast → PWA handler → `chat-renderer` → CSS monospace block ([70fe28c4a])
+- **Status filter returning empty** — removed broken `<select id="status-filter">` from PWA; most conversations have `unknown` status so it always returned nothing ([70fe28c4a])
 - **History truncation for large sessions** — `readWorkspaceChatSessionHistory` now caps returned turns to the latest 100; the full JSONL file is still replayed to reconstruct correct state, but only the most recent context is sent to the PWA, preventing WebSocket overflow on 8–12 MB session files
 - **Conversation view disappears on switch+submit** — two root causes fixed:
   1. Stale `conversation:history` response arriving after the user already typed+submitted wiped
