@@ -48,11 +48,8 @@ export interface BridgeAssistantToolInvocationItem {
 	readonly isError: boolean;
 	readonly isComplete: boolean;
 	readonly todoList?: readonly BridgeTodoListItem[];
-}
-
-export interface BridgeAssistantReferenceItem {
-	readonly label: string;
-	readonly uri: string | undefined;
+	readonly commandLine?: string;
+	readonly terminalOutput?: string;
 }
 
 export interface BridgeAssistantCodeCitationItem {
@@ -282,6 +279,8 @@ export type BridgeMessage =
 		isError: boolean;
 		isComplete: boolean;
 		todoList?: readonly BridgeTodoListItem[];
+		commandLine?: string;
+		terminalOutput?: string;
 	}
 	| {
 		type: 'turn:confirmation';

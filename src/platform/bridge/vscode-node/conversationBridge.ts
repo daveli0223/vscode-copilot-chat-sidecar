@@ -277,6 +277,7 @@ export class ConversationBridge extends Disposable {
 				isComplete: event.isComplete,
 				todoList: event.todoList,
 				commandLine: event.commandLine,
+				terminalOutput: event.terminalOutput,
 				isConfirmationPending: event.isConfirmationPending,
 			});
 			// When a terminal tool is waiting for the user to confirm, emit a synthetic
@@ -2312,33 +2313,28 @@ export class ConversationBridge extends Disposable {
 			return;
 		}
 
-		// For an existing conversation use the one-shot open+submit command.
-		// For a new conversation (no sessionId) skip the one-shot path: VS Code may
-		// return successfully without actually submitting when no session is specified,
-		// so we always fall through to the explicit open → submit two-step.
-		if (conversationId) {
+		if (!conversationId) {
+			// New conversation: ensure the panel is open so newChat has a widget to act on,
+			// then call newChat with inputValue which clears the session AND submits in one
+			// atomic step (matching VS Code's own welcome-page pattern).
 			try {
-				await vscode.commands.executeCommand('workbench.action.chat.open', {
-					query: trimmedPrompt,
+				await vscode.commands.executeCommand('workbench.action.chat.open');
+				await vscode.commands.executeCommand('workbench.action.chat.newChat', {
+					inputValue: trimmedPrompt,
 					isPartialQuery: false,
-					sessionId: conversationId,
 				});
 				return;
 			} catch (error) {
-				this.logService.warn(`[ConversationBridge] Failed to submit prompt with direct chat.open submission: ${error instanceof Error ? error.message : String(error)}`);
+				this.logService.warn(`[ConversationBridge] newChat with inputValue failed, falling back: ${error instanceof Error ? error.message : String(error)}`);
 			}
 		}
 
-		// Two-step fallback: open the panel (fills the query input), then submit.
+		// Existing conversation (or fallback): submit to the currently-focused widget.
+		// Note: chat.open does not use sessionId for routing; it targets lastFocusedWidget,
+		// so this works when VS Code is already showing the right session.
 		await vscode.commands.executeCommand('workbench.action.chat.open', {
 			query: trimmedPrompt,
-			...(conversationId ? { sessionId: conversationId } : {}),
+			isPartialQuery: false,
 		});
-
-		try {
-			await vscode.commands.executeCommand('workbench.action.chat.submit');
-		} catch {
-			// Some VS Code versions may not expose workbench.action.chat.submit.
-		}
 	}
 }

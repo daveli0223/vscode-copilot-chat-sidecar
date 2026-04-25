@@ -323,12 +323,16 @@ export class ChatParticipantRequestHandler {
 			}));
 		}
 
-		// Extract command line from ChatTerminalToolInvocationData via duck-typing.
+		// Extract command line and terminal output from ChatTerminalToolInvocationData via duck-typing.
 		let commandLine: string | undefined;
+		let terminalOutput: string | undefined;
 		if (toolSpecificData && typeof toolSpecificData === 'object') {
-			const cmdData = toolSpecificData as { commandLine?: { original?: string } };
+			const cmdData = toolSpecificData as { commandLine?: { original?: string }; output?: { text?: string } };
 			if (typeof cmdData.commandLine?.original === 'string') {
 				commandLine = cmdData.commandLine.original.trim() || undefined;
+			}
+			if (typeof cmdData.output?.text === 'string' && cmdData.output.text.trim()) {
+				terminalOutput = cmdData.output.text;
 			}
 		}
 
@@ -344,6 +348,7 @@ export class ChatParticipantRequestHandler {
 			isComplete: Boolean(part.isComplete),
 			todoList,
 			commandLine,
+			terminalOutput,
 			isConfirmationPending: commandLine ? isConfirmationPending : undefined,
 		};
 	}

@@ -48,22 +48,30 @@
 		}
 
 		configureMarkdown() {
-			if (window.marked) {
-				window.marked.setOptions({
-					gfm: true,
-					breaks: true,
-					headerIds: false,
-					mangle: false,
-					highlight(code, lang) {
-						if (!window.hljs) {
-							return code;
+			if (!window.marked) {
+				return;
+			}
+			// marked v4 API: setOptions with highlight callback
+			if (typeof window.marked.setOptions === 'function') {
+				try {
+					window.marked.setOptions({
+						gfm: true,
+						breaks: true,
+						headerIds: false,
+						mangle: false,
+						highlight(code, lang) {
+							if (!window.hljs) {
+								return code;
+							}
+							if (lang && window.hljs.getLanguage(lang)) {
+								return window.hljs.highlight(code, { language: lang }).value;
+							}
+							return window.hljs.highlightAuto(code).value;
 						}
-						if (lang && window.hljs.getLanguage(lang)) {
-							return window.hljs.highlight(code, { language: lang }).value;
-						}
-						return window.hljs.highlightAuto(code).value;
-					}
-				});
+					});
+				} catch (e) {
+					// ignore unknown option warnings in newer marked versions
+				}
 			}
 		}
 
@@ -511,7 +519,25 @@
 				? tool.message.trim()
 				: `${toolName} (${statusText})`;
 
-			item.textContent = `${toolName}: ${summary}`;
+			// Render summary line
+			let header = item.querySelector('.tool-summary');
+			if (!header) {
+				header = document.createElement('div');
+				header.className = 'tool-summary';
+				item.appendChild(header);
+			}
+			header.textContent = `${toolName}: ${summary}`;
+
+			// Render terminal output as a code block if present
+			if (typeof tool.terminalOutput === 'string' && tool.terminalOutput.trim()) {
+				let outputBlock = item.querySelector('.tool-terminal-output');
+				if (!outputBlock) {
+					outputBlock = document.createElement('pre');
+					outputBlock.className = 'tool-terminal-output';
+					item.appendChild(outputBlock);
+				}
+				outputBlock.textContent = tool.terminalOutput;
+			}
 			this.scrollToBottom();
 		}
 

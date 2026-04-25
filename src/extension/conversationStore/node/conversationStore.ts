@@ -82,8 +82,8 @@ export interface IConversationTurnToolInvocationEvent {
 	readonly todoList?: readonly ITodoListItem[];
 	/** Shell command line for terminal-tool invocations (duck-typed from ChatTerminalToolInvocationData). */
 	readonly commandLine?: string;
-	/** True when VS Code is awaiting user confirmation before running this tool (isComplete === false, isError === false). */
-	readonly isConfirmationPending?: boolean;
+	/** Terminal stdout/stderr output text (from ChatTerminalToolInvocationData.output.text). */
+	readonly terminalOutput?: string;
 }
 
 export interface IConversationTurnConfirmationEvent {

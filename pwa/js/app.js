@@ -294,6 +294,7 @@
                         statusBadge.className = `conv-status-badge${isStreaming ? ' working' : ' done'}`;
                         statusBadge.textContent = isStreaming ? 'working' : 'done';
                         time.appendChild(statusBadge);
+			item.appendChild(time);
 			item.addEventListener('click', () => {
 				selectConversation(conversation.id);
 			});
@@ -413,7 +414,11 @@
 	}
 
 	function selectConversation(conversationId) {
-		state.currentConversationId = conversationId;
+                // Clear optimistic queue for the conversation we're leaving — the server-confirmed
+                // history will be loaded when we return, so stale optimistic entries must not block it.
+                if (state.currentConversationId && state.currentConversationId !== conversationId) {
+                        state.optimisticByConversation.delete(state.currentConversationId);
+                }
 		window.localStorage.setItem('sidecar.currentConversationId', conversationId);
 		state.isComposingNewConversation = false;
 		state.isStreaming = false;
@@ -457,16 +462,13 @@
 		if (!message || message.conversationId !== state.currentConversationId) {
 			return;
 		}
-		// Skip stale history if the user has already submitted a message while the
-		// history fetch was in-flight. Calling renderHistory() here would wipe the
-		// optimistic user-turn (and any streaming response) from the view.
-		if ((state.optimisticByConversation.get(message.conversationId)?.length ?? 0) > 0 || state.isStreaming) {
-			return;
-		}
-		renderer.renderHistory(message.turns);
-	}
-
-	function handleIncomingUserTurn(message) {
+                // Skip stale history if streaming is in progress — the live stream takes precedence.
+                if (state.isStreaming) {
+                        return;
+                }
+                // Any remaining optimistic entries for this conversation are superseded by the
+                // server-confirmed history arriving now. Clear them so they don't block rendering.
+                state.optimisticByConversation.delete(message.conversationId);
 		if (!state.currentConversationId) {
 			state.currentConversationId = message.conversationId;
 			window.localStorage.setItem('sidecar.currentConversationId', message.conversationId);
@@ -566,14 +568,9 @@
 				message: message.message,
 				isError: message.isError,
 				isComplete: message.isComplete,
-			});
-		}
-	}
-
-	function handleIncomingAssistantConfirmation(message) {
-		if (message.conversationId === state.currentConversationId) {
-			renderer.appendAssistantConfirmation(message.turnId, {
-				title: message.title,
+                                todoList: message.todoList,
+                                commandLine: message.commandLine,
+                                terminalOutput: message.terminalOutput,
 				message: message.message,
 				buttons: message.buttons,
 			});

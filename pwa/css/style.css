@@ -553,6 +553,20 @@ details[open] > .assistant-thinking-summary::before {
 	border-color: #b85c56;
 }
 
+.tool-terminal-output {
+	margin: 6px 0 0;
+	padding: 6px 8px;
+	background: var(--vscode-terminal-background, #1e1e1e);
+	color: var(--vscode-terminal-foreground, #cccccc);
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 0.75rem;
+	border-radius: 4px;
+	white-space: pre-wrap;
+	word-break: break-all;
+	max-height: 200px;
+	overflow: auto;
+}
+
 .assistant-confirmation-item,
 .assistant-questions-item {
 	border: 1px solid var(--vscode-sideBar-border);
