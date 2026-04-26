@@ -229,6 +229,20 @@ html, body {
 	text-overflow: ellipsis;
 }
 
+.conversation-description {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	opacity: 0.75;
+}
+
+.conversation-description.streaming {
+	opacity: 1;
+	color: var(--vscode-foreground);
+}
+
 .conversation-time {
 	font-size: 11px;
 	color: var(--vscode-descriptionForeground);
@@ -554,6 +568,19 @@ details[open] > .assistant-thinking-summary::before {
 	border-color: #b85c56;
 }
 
+.tool-command-line {
+	margin: 6px 0 0;
+	padding: 5px 8px;
+	background: color-mix(in srgb, var(--vscode-textCodeBlock-background) 80%, transparent);
+	color: var(--vscode-foreground);
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 0.75rem;
+	border-radius: 4px;
+	white-space: pre-wrap;
+	word-break: break-all;
+	border-left: 2px solid var(--vscode-focusBorder, #007acc);
+}
+
 .tool-terminal-output {
 	margin: 6px 0 0;
 	padding: 6px 8px;
@@ -604,7 +631,9 @@ details[open] > .assistant-thinking-summary::before {
 	border-radius: 10px;
 	border: 1px solid var(--vscode-sideBar-border);
 	background: color-mix(in srgb, var(--vscode-button-background) 22%, transparent);
+	color: var(--vscode-foreground);
 	font-size: 11px;
+	cursor: pointer;
 }
 
 .assistant-confirmation-code {

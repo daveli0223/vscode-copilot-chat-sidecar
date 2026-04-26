@@ -285,15 +285,22 @@
 			title.textContent = conversation.title || 'Untitled conversation';
 			item.appendChild(title);
 
+			if (conversation.lastStatus) {
+				const desc = document.createElement('div');
+				desc.className = `conversation-description${isStreaming ? ' streaming' : ''}`;
+				desc.textContent = conversation.lastStatus;
+				item.appendChild(desc);
+			}
+
 			const time = document.createElement('div');
 			time.className = 'conversation-time';
-                        const timeText = document.createElement('span');
-                        timeText.textContent = formatRelativeTime(conversation.lastUpdated);
-                        time.appendChild(timeText);
-                        const statusBadge = document.createElement('span');
-                        statusBadge.className = `conv-status-badge${isStreaming ? ' working' : ' done'}`;
-                        statusBadge.textContent = isStreaming ? 'working' : 'done';
-                        time.appendChild(statusBadge);
+			const timeText = document.createElement('span');
+			timeText.textContent = formatRelativeTime(conversation.lastUpdated);
+			time.appendChild(timeText);
+			const statusBadge = document.createElement('span');
+			statusBadge.className = `conv-status-badge${isStreaming ? ' working' : ' done'}`;
+			statusBadge.textContent = isStreaming ? 'working' : 'done';
+			time.appendChild(statusBadge);
 			item.appendChild(time);
 			item.addEventListener('click', () => {
 				selectConversation(conversation.id);
@@ -323,7 +330,39 @@
 				badge.className = `conv-status-badge${isStreaming ? ' working' : ' done'}`;
 				badge.textContent = isStreaming ? 'working' : 'done';
 			}
+			const desc = activeItem.querySelector('.conversation-description');
+			if (desc) {
+				desc.classList.toggle('streaming', isStreaming);
+			}
 		}
+	}
+
+	function updateActiveConversationStatusText(text) {
+		// Update lastStatus on the conversation object.
+		const conversation = state.conversations.find(c => c.id === state.currentConversationId);
+		if (conversation) {
+			conversation.lastStatus = text;
+		}
+		// Update the sidebar item in-place without rebuilding the full list.
+		const activeItem = conversationListEl.querySelector('.conversation-item.active');
+		if (!activeItem) {
+			return;
+		}
+		let desc = activeItem.querySelector('.conversation-description');
+		if (!text) {
+			if (desc) {
+				desc.remove();
+			}
+			return;
+		}
+		if (!desc) {
+			desc = document.createElement('div');
+			desc.className = 'conversation-description streaming';
+			// Insert after the title, before the time row.
+			const timeRow = activeItem.querySelector('.conversation-time');
+			activeItem.insertBefore(desc, timeRow);
+		}
+		desc.textContent = text;
 	}
 
 	function renderSelector(selectEl, options, selectedId, fallbackLabel) {
@@ -561,6 +600,10 @@
 				kind: message.kind,
 				content: message.content,
 			});
+			// Mirror the latest status text into the sidebar description.
+			if (message.content) {
+				updateActiveConversationStatusText(message.content);
+			}
 		}
 	}
 
@@ -622,7 +665,8 @@
 			renderer.completeAssistantTurn(message.turnId);
 			state.isStreaming = false;
 			updateComposerStopState();
-			// Remove the streaming class without rebuilding the whole list.
+			// Clear the status description and remove streaming class from sidebar.
+			updateActiveConversationStatusText('');
 			updateActiveConversationStreamingClass(false);
 		}
 	}

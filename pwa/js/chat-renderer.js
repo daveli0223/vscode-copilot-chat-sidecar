@@ -528,6 +528,17 @@
 			}
 			header.textContent = `${toolName}: ${summary}`;
 
+			// Render command line as a code block if present (shown before output arrives)
+			if (typeof tool.commandLine === 'string' && tool.commandLine.trim()) {
+				let cmdBlock = item.querySelector('.tool-command-line');
+				if (!cmdBlock) {
+					cmdBlock = document.createElement('pre');
+					cmdBlock.className = 'tool-command-line';
+					item.appendChild(cmdBlock);
+				}
+				cmdBlock.textContent = tool.commandLine.trim();
+			}
+
 			// Render terminal output as a code block if present
 			if (typeof tool.terminalOutput === 'string' && tool.terminalOutput.trim()) {
 				let outputBlock = item.querySelector('.tool-terminal-output');
