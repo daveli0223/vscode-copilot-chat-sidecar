@@ -81,9 +81,29 @@
 			}
 		},
 		{
+			"label": "ensure-sidecar",
+			"type": "shell",
+			"osx": {
+				"command": "EXT_DIR=$(ls -d ~/.vscode/extensions/github.copilot-chat-* 2>/dev/null | head -1); if [ -d \"$EXT_DIR/pwa\" ]; then echo '=== Sidecar OK ==='; else echo '=== Sidecar overwritten by auto-update — reinstalling ===' && ./script/reinstall-sidecar.sh; fi"
+			},
+			"linux": {
+				"command": "EXT_DIR=$(ls -d ~/.vscode/extensions/github.copilot-chat-* 2>/dev/null | head -1); if [ -d \"$EXT_DIR/pwa\" ]; then echo '=== Sidecar OK ==='; else echo '=== Sidecar overwritten by auto-update — reinstalling ===' && ./script/reinstall-sidecar.sh; fi"
+			},
+			"group": "build",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"close": false
+			},
+			"problemMatcher": [],
+			"isBackground": false,
+			"promptOnClose": false
+		},
+		{
 			"label": "watch",
 			"dependsOn": [
 				"ensure-deps",
+				"ensure-sidecar",
 				"start-watch-tasks",
 			],
 			"dependsOrder": "sequence",
